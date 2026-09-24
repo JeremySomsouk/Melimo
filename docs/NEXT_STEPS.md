@@ -1,0 +1,61 @@
+# Mélimo next steps
+
+## v0.1.0 terminal player complete
+
+- [x] Give the terminal interface a more polished, distinctive Mélimo identity
+  while keeping navigation simple and keyboard-first.
+- [x] Add a cohesive accent palette with readable light/dark terminal colors and
+  a monochrome fallback; use subtle highlights rather than visual clutter.
+- [x] Improve spacing, borders, typography emphasis and hierarchy across Discover,
+  search results, playlists and the queue.
+- [x] Make Now Playing the visual centerpiece: prominent song/artist information,
+  a styled progress bar, clear playback status and recognizable shortcut hints.
+- [x] Polish karaoke with a prominent active line and subdued surrounding lyrics.
+- [x] Add restrained loading/buffering feedback and consistent empty/error states.
+- [x] Verify narrow terminal layouts, contrast and rendering performance; preview
+  the design with synthetic metadata and lyrics.
+
+First visual pass implemented: plum accent, dark/light/mono themes, rounded panels,
+clearer player hierarchy, compact transport hints and empty queue guidance.
+Synthetic rendering tests cover 60-column player controls and active lyrics.
+Synthetic visual review, PTY resize/exit checks and optimized render measurements
+are complete. The maintainer confirmed live testing of main on 2026-09-24.
+See [release validation](RELEASE.md) for scope and publication checks.
+
+## Website player / Rust-WASM follow-up
+
+Requested after the terminal playback/discovery/queue/login work is complete.
+Target: https://github.com/JeremySomsouk/jeremysomsouk.github.io
+Desired route: a homepage shortcut to a dedicated web player (for example /melimo/).
+No website changes are part of the current terminal checkpoint.
+
+### Feasibility
+
+A Rust/WebAssembly UI/shared queue core is feasible, similar to Cabane. The website
+README confirms `docs/` serves GitHub Pages and `games/` contains existing Rust/WASM
+engines. The terminal crate itself cannot simply be compiled unchanged for browsers:
+Crossterm input, native threads and native audio need browser-specific adapters.
+
+Suggested next investigation:
+1. Extract provider-independent models, queue and playback state into a shared Rust
+   library; keep terminal, browser and network backends separate.
+2. Build a static web UI with a Web Audio or HTML media adapter and shared WASM core.
+3. Verify an authorized browser authentication/playback integration before choosing
+   a backend. Browser fetch obeys CORS and cannot freely set the Cookie header;
+   compiling HTTP code to WASM does not remove those restrictions.
+4. If a server is needed, design it as an authenticated, per-user service hosted
+   separately. GitHub Pages serves static assets and cannot run that server. Do not
+   bundle an ARL, license token or signed media URL into the public site/WASM bundle.
+5. After that decision, add /melimo/ and a homepage navigation shortcut, with keyboard
+   controls, mobile layout, autoplay handling and accessibility validation.
+
+Start with a browser demo using synthetic audio/metadata to validate the UI. Decide
+between a supported browser playback integration and a properly authenticated
+service only after investigating current provider support. No anonymous/shared
+account relay and no promise that full Deezer playback works on static Pages alone.
+
+Sources checked 2026-09-23:
+- Website: https://github.com/JeremySomsouk/jeremysomsouk.github.io
+- Static hosting: https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages
+- Browser CORS: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
+

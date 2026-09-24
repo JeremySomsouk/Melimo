@@ -1,0 +1,29 @@
+[package]
+name = "melimo"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "A streaming-only terminal music player"
+repository = "https://github.com/JeremySomsouk/Melimo"
+
+[dependencies]
+crossterm = "0.29"
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+unicode-width = "0.2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+rodio = { version = "0.21.1", default-features = false, features = ["playback", "symphonia-mp3"] }
+blowfish = "0.9"
+md-5 = "0.10"
+rand = "0.10"
+rpassword = "7"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["net", "io-util", "time"] }
+

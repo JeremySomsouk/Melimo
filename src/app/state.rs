@@ -1,5 +1,5 @@
 use super::action::Action;
-use crate::provider::{BrowseKind, BrowseResults, Playlist, Track};
+use crate::provider::{BrowseKind, BrowseResults, Playlist, ProviderId, Track};
 use rand::seq::SliceRandom;
 use std::collections::VecDeque;
 
@@ -89,6 +89,8 @@ impl Volume {
 
 #[derive(Default)]
 pub struct App {
+    pub search_provider: ProviderId,
+    pub providers: Vec<ProviderId>,
     pub karaoke: bool,
     pub lyrics: Option<Result<crate::provider::Lyrics, String>>,
     pub quit: bool,
@@ -120,6 +122,7 @@ pub struct App {
 }
 
 pub struct SearchRequest {
+    pub provider: ProviderId,
     pub id: u64,
     pub query: String,
     pub kind: BrowseKind,
@@ -169,6 +172,7 @@ impl App {
         self.playlists.clear();
         self.selected = None;
         Some(SearchRequest {
+            provider: self.search_provider,
             id: self.request_id,
             query,
             kind,
@@ -188,6 +192,31 @@ impl App {
 
     pub fn update(&mut self, action: Action) -> Option<SearchRequest> {
         match action {
+            Action::CycleProvider => {
+                if let Some(index) = self
+                    .providers
+                    .iter()
+                    .position(|p| *p == self.search_provider)
+                {
+                    self.search_provider = self.providers[(index + 1) % self.providers.len()];
+                }
+                self.request_id += 1;
+                self.pending_playlist_play = None;
+                self.loading = false;
+                self.playlist_search = false;
+                self.showing_playlists = false;
+                self.tracks.clear();
+                self.playlists.clear();
+                self.selected = None;
+                self.collection = None;
+                self.error = None;
+                self.searched = false;
+                self.view = View::Search;
+                self.notice = Some(format!(
+                    "{} search · / to edit",
+                    self.search_provider.name()
+                ));
+            }
             Action::ToggleLyrics => {
                 self.karaoke = !self.karaoke;
                 if self.opened.is_some() {
@@ -271,8 +300,20 @@ impl App {
                 self.pending_playlist_play = None;
                 self.editing = false;
                 self.selected = Some(0);
+                if self.search_provider == ProviderId::Invidious {
+                    self.view = View::Search;
+                    self.selected = (!self.tracks.is_empty()).then_some(0);
+                    self.notice =
+                        Some("Invidious: / to search videos · P switches provider.".into());
+                }
             }
             Action::ToggleSearchKind => {
+                if self.search_provider == ProviderId::Invidious {
+                    self.notice = Some(
+                        "Invidious playlists are not available yet. Use / to search videos.".into(),
+                    );
+                    return None;
+                }
                 self.playlist_search = !self.playlist_search;
                 self.showing_playlists = self.playlist_search;
                 self.request_id += 1;
@@ -383,6 +424,10 @@ impl App {
             Action::Back if self.view == View::Queue => self.view = View::Search,
             Action::Back if self.view == View::NowPlaying => self.view = View::Search,
             Action::Back if self.view == View::Search => {
+                if self.search_provider == ProviderId::Invidious {
+                    self.quit = true;
+                    return None;
+                }
                 self.view = View::Discover;
                 self.selected = Some(0);
                 self.request_id += 1;
@@ -505,12 +550,68 @@ mod tests {
 
     fn track() -> Track {
         Track {
+            provider: crate::provider::ProviderId::Mock,
             id: "mock:0".into(),
             title: "Title".into(),
             artist: "Artist".into(),
             album: "Album".into(),
             duration_secs: 123,
         }
+    }
+
+    #[test]
+    fn mixed_queue_preserves_provider_even_when_ids_match() {
+        let mut deezer = track();
+        deezer.provider = crate::provider::ProviderId::Deezer;
+        let mut invidious = deezer.clone();
+        invidious.provider = crate::provider::ProviderId::Invidious;
+        let mut app = App {
+            tracks: vec![deezer.clone(), invidious.clone()],
+            selected: Some(0),
+            ..App::default()
+        };
+        app.update(Action::PlayAll);
+        assert_eq!(app.opened.as_ref(), Some(&deezer));
+        app.tracks.clear();
+        app.update(Action::NextTrack);
+        assert_eq!(app.opened.as_ref(), Some(&invidious));
+        app.update(Action::TogglePause);
+        app.update(Action::SeekRelative(10));
+        assert!(app.pause_requested);
+        assert_eq!(app.opened.as_ref(), Some(&invidious));
+        app.update(Action::StopPlayback);
+        assert!(app.queue.is_empty());
+    }
+
+    #[test]
+    fn provider_switch_invalidates_search_but_preserves_player_and_queue() {
+        let mut app = App {
+            providers: vec![ProviderId::Deezer, ProviderId::Invidious],
+            tracks: vec![track(), track()],
+            ..App::default()
+        };
+        app.update(Action::PlayAll);
+        let playing = app.opened.clone();
+        let playback_id = app.playback_id;
+        let request = app.update(Action::SubmitSearch).unwrap();
+        assert_eq!(request.provider, ProviderId::Deezer);
+        app.update(Action::CycleProvider);
+        app.update(Action::SearchFinished {
+            id: request.id,
+            result: Ok(vec![track()]),
+        });
+        assert!(app.tracks.is_empty());
+        assert_eq!(app.opened, playing);
+        assert_eq!(app.playback_id, playback_id);
+        assert_eq!(app.queue.len(), 1);
+        assert_eq!(app.search_provider, ProviderId::Invidious);
+        app.update(Action::ToggleSearchKind);
+        assert!(!app.playlist_search);
+        app.update(Action::Discover);
+        assert!(app.view == View::Search);
+        let request = app.update(Action::SubmitSearch).unwrap();
+        assert_eq!(request.provider, ProviderId::Invidious);
+        assert!(matches!(request.kind, BrowseKind::Tracks));
     }
 
     #[test]

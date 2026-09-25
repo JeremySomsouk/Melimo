@@ -59,6 +59,7 @@ fn map_key(key: KeyEvent, app: &App) -> Option<Action> {
         KeyCode::Delete if app.view == View::Queue => Some(Action::RemoveQueued),
         KeyCode::Char('l') => Some(Action::ToggleLyrics),
         KeyCode::Char('p') => Some(Action::ShowPlayer),
+        KeyCode::Char('P') => Some(Action::CycleProvider),
         KeyCode::Char('b') => Some(Action::ShowQueue),
         KeyCode::Char('r') => Some(Action::ShufflePlay),
         KeyCode::Char('f') => Some(Action::ToggleFavorite),
@@ -131,7 +132,7 @@ mod tests {
     fn text_entry_does_not_trigger_shortcuts() {
         let mut app = App::default();
         app.update(Action::FocusSearch);
-        for c in ['q', '/', '?', 'j', 'é', 'l', ' '] {
+        for c in ['q', '/', '?', 'j', 'é', 'l', 'P', ' '] {
             assert!(
                 matches!(map_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE), &app), Some(Action::Insert(value)) if value == c)
             );
@@ -142,6 +143,11 @@ mod tests {
                 &app
             ),
             Some(Action::Quit)
+        ));
+        app.editing = false;
+        assert!(matches!(
+            map_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::NONE), &app),
+            Some(Action::CycleProvider)
         ));
     }
 }

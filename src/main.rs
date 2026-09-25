@@ -5,9 +5,9 @@ mod provider;
 mod tui;
 
 use provider::{
-    MusicProvider,
     deezer::{DeezerError, DeezerProvider},
-    mock::MockProvider,
+    invidious::AutomaticProvider,
+    router::Providers,
 };
 use std::{
     io::{self, IsTerminal},
@@ -29,7 +29,7 @@ async fn start() -> Result<(), String> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
         println!(
-            "Mélimo — unofficial streaming-only terminal music client\n\nUsage: melimo [--mock | --check-auth | --login | --forget | --version]\n\nDefault: Deezer search using DEEZER_ARL or the saved login.\n--mock: offline demo with fictional tracks.\n--check-auth: validate credentials without opening the TUI.\n--login: open browser sign-in; saves your ARL cookie (0600) for next launch.\n--forget: delete the saved ARL cookie.\n--version: print the version and exit.\n\nSet MELIMO_NO_STORE=1 to never write the saved login.\nEnter plays a selected Deezer track. Space pauses/resumes; s stops."
+            "Mélimo — unofficial streaming-only terminal music client\n\nUsage: melimo [--mock | --invidious | --check-auth | --login | --forget | --version]\n\nDefault: Deezer search using DEEZER_ARL or the saved login.\n--invidious: anonymous Invidious audio with automatic instance selection.\n--mock: offline demo with fictional tracks.\n--check-auth: validate credentials without opening the TUI.\n--login: open browser sign-in; saves your ARL cookie (0600) for next launch.\n--forget: delete the saved ARL cookie.\n--version: print the version and exit.\n\nSet MELIMO_NO_STORE=1 to never write the saved login.\nSet MELIMO_CONFIG to a TOML settings file; see README for [invidious].\nEnter plays a selected track. P switches search provider. Space pauses/resumes; s stops."
         );
         return Ok(());
     }
@@ -40,6 +40,7 @@ async fn start() -> Result<(), String> {
     if args.len() > 1
         || args.first().is_some_and(|arg| {
             arg != "--mock"
+                && arg != "--invidious"
                 && arg != "--check-auth"
                 && arg != "--version"
                 && arg != "--login"
@@ -68,9 +69,31 @@ async fn start() -> Result<(), String> {
         return Err("An interactive terminal is required.".into());
     }
     if args.first().is_some_and(|arg| arg == "--mock") {
-        run(MockProvider)
+        run(Providers {
+            mock: true,
+            ..Default::default()
+        })
     } else {
-        run(connect(&args).await?)
+        let settings = config::invidious::Settings::load()?;
+        let invidious = if settings.invidious.enabled {
+            Some(AutomaticProvider::new(settings.invidious.instance()?)?)
+        } else {
+            None
+        };
+        let invidious_only = args.first().is_some_and(|arg| arg == "--invidious");
+        if invidious_only && invidious.is_none() {
+            return Err("Invidious is disabled. Set [invidious] enabled = true in your Mélimo configuration.".into());
+        }
+        let deezer = if invidious_only {
+            None
+        } else {
+            Some(connect(&args).await?)
+        };
+        run(Providers {
+            deezer,
+            invidious,
+            mock: false,
+        })
     }
 }
 
@@ -122,7 +145,7 @@ async fn login_provider() -> Result<DeezerProvider, String> {
     Ok(provider)
 }
 
-fn run(provider: impl MusicProvider) -> Result<(), String> {
+fn run(provider: Providers) -> Result<(), String> {
     let mut terminal = ratatui::init();
     let result = app::run(&mut terminal, provider);
     ratatui::restore();

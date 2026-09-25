@@ -28,9 +28,6 @@ impl MusicProvider for MockProvider {
             _ => Ok(BrowseResults::Tracks(catalog())),
         }
     }
-    fn name(&self) -> &'static str {
-        "Mock · offline"
-    }
 
     async fn search_tracks(&self, query: String) -> Result<Vec<Track>, String> {
         // Fictional metadata, not playable tracks. Yield through the same task path
@@ -62,6 +59,7 @@ fn catalog() -> Vec<Track> {
     .into_iter()
     .enumerate()
     .map(|(index, (title, artist, album, duration_secs))| Track {
+        provider: crate::provider::ProviderId::Mock,
         id: format!("mock:{index}"),
         title: title.into(),
         artist: artist.into(),

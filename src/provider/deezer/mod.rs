@@ -300,9 +300,6 @@ impl MusicProvider for DeezerProvider {
     ) -> Result<(), String> {
         self.stream(id, audio).await.map_err(|e| e.to_string())
     }
-    fn name(&self) -> &'static str {
-        "Deezer · unofficial"
-    }
     async fn search_tracks(&self, query: String) -> Result<Vec<Track>, String> {
         self.search(query).await.map_err(|error| error.to_string())
     }

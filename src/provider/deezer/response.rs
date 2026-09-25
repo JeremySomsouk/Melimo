@@ -126,6 +126,7 @@ impl SearchResults {
             .into_iter()
             .map(|song| {
                 Ok(Track {
+                    provider: crate::provider::ProviderId::Deezer,
                     id: song.id.get()?.to_string(),
                     title: display_text(song.title),
                     artist: display_text(song.artist),

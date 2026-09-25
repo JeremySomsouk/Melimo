@@ -23,11 +23,20 @@ malware, privileged processes, OS swap, crash dumps or backups.
 
 ## Network and terminal boundaries
 
-Production endpoints require HTTPS and reject redirects. Cookies are scoped to the
+Deezer production endpoints require HTTPS and reject redirects. Cookies are scoped to the
 fixed gateway; media requests do not carry them. Responses and transfer sizes are
 limited, stalled connections time out, and raw network errors are not displayed.
 Provider metadata is stripped of terminal controls; terminal titles also receive
 a final control-character filter and length bound.
+
+Invidious uses an anonymous client with no cookie
+jar or account headers. Instance settings accept HTTP(S); use HTTPS for remote
+instances. Stream hosts are supplied by the chosen instance, and redirects are
+limited to five hops. Choose infrastructure you trust: searches go to the instance
+and playback connects to the returned media host. API bodies are bounded to 2 MiB,
+API calls have an overall timeout, and stream reads have an idle timeout. Error
+messages omit raw bodies and signed URLs. Personal settings belong outside the
+repository; the committed example contains only an invalid placeholder domain.
 
 ## Before public publication
 

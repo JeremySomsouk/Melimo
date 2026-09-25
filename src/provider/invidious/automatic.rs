@@ -243,16 +243,20 @@ mod tests {
         let good_url = Url::parse(&format!("http://{}/", good.local_addr().unwrap())).unwrap();
         let first = tokio::spawn(async move {
             let (mut socket, _) = bad.accept().await.unwrap();
-            let mut request = [0; 4096];
-            socket.read(&mut request).await.unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                request.push(socket.read_u8().await.unwrap());
+            }
             let reply =
                 b"HTTP/1.1 503 Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             socket.write_all(reply).await.unwrap();
         });
         let second = tokio::spawn(async move {
             let (mut socket, _) = good.accept().await.unwrap();
-            let mut request = [0; 4096];
-            socket.read(&mut request).await.unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                request.push(socket.read_u8().await.unwrap());
+            }
             let reply = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n[]";
             socket.write_all(reply).await.unwrap();
         });

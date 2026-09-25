@@ -1,0 +1,5 @@
+# Copy to your user configuration directory or select it with MELIMO_CONFIG.
+# Never commit your personal instance settings.
+[youtube]
+enabled = false
+invidious_instance = "https://example.invalid"

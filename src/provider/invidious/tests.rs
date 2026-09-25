@@ -129,7 +129,7 @@ async fn search_metadata_resolve_and_stream_use_one_anonymous_pipeline() {
     assert_eq!(collect.await.unwrap(), fixture);
     let requests = server.requests().await;
     assert!(requests[0].starts_with("GET /prefix/api/v1/search?q=hello+%26+caf%C3%A9&type=video "));
-    assert!(requests[1].starts_with("GET /prefix/api/v1/videos/abcdefghijk "));
+    assert!(requests[1].starts_with("GET /prefix/api/v1/videos/abcdefghijk?local=true "));
     assert!(requests[2].starts_with("GET /audio "));
     for request in requests {
         assert!(!request.to_ascii_lowercase().contains("cookie:"));

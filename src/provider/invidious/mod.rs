@@ -136,10 +136,13 @@ impl InvidiousProvider {
 
     async fn metadata(&self, id: &str) -> Result<Video, String> {
         validate_id(id)?;
-        let url = self
+        let mut url = self
             .instance
             .join(&format!("api/v1/videos/{id}"))
             .map_err(|_| "Invalid Invidious endpoint.")?;
+        // Ask the chosen instance for proxied URLs: upstream signed URLs may be
+        // bound to the instance's IP rather than the listener's connection.
+        url.query_pairs_mut().append_pair("local", "true");
         let video: Video = serde_json::from_value(self.json(url).await?)
             .map_err(|_| "Invalid Invidious video metadata.")?;
         if video.video_id != id {

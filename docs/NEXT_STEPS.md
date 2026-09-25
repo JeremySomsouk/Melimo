@@ -1,6 +1,6 @@
 # Mélimo next steps
 
-## IN PROGRESS — YouTube / Invidious audio provider
+## COMPLETE — YouTube / Invidious audio provider (2026-09-25)
 
 - [x] Introduce and test provider-aware media models and provider routing.
 - [x] Preserve Deezer search, discovery, authentication and playback behavior.
@@ -11,19 +11,29 @@
 - [x] Support play/pause, seek, stop and provider identification in the TUI.
 - [x] Handle provider, timeout, rate-limit, restriction and playback errors.
 - [x] Add unit and focused HTTP/playback integration tests; run existing tests.
-- [ ] Document configuration, architecture and runtime dependencies.
+- [x] Document configuration, architecture and runtime dependencies.
 
 Initial scope: provider-specific search and audio-only playback. No browser player,
 authentication, video renderer or SponsorBlock integration for YouTube.
 
-Checkpoint: Invidious configuration, search, resolution and playback are wired;
-72 automated tests pass (including existing Deezer tests). Tracks carry provider identity; queue snapshots and TUI
-labels preserve it. All existing tests plus mixed-provider queue/transport tests
-pass. Keep the existing `Track` model (including Deezer album display); add only
-the identity needed for routing. Resolution will select audio-only AAC/M4A and
-feed the existing bounded decoder/player, without an external runtime extractor.
+Implementation: the existing `Track` model now carries provider identity; routing
+preserves Deezer capabilities and mixed queue snapshots. Invidious search and
+metadata feed a separate stream resolver. Resolution selects audio-only AAC/M4A
+and requests instance-proxied URLs (`local=true`); the existing bounded audio
+pipeline handles playback and transport. No external runtime extractor is needed.
+
+Validation: 73 automated tests pass, including all Deezer regressions, Invidious
+HTTP fixtures, mixed queues, error propagation, nonseekable AAC decoding/seeking
+and TUI provider labels at 40/60/100 columns. Formatting, strict Clippy and release
+build pass. Both generated MP3 and AAC audio-device smoke tests pass. A temporary
+local Invidious fixture exercised the real TUI through anonymous startup, search,
+enqueue, queue playback, pause, seek while paused, resume, next, resize, stop and
+clean exit. No live public instance or Deezer account was used in this milestone's
+validation; live instance availability remains an operational check below.
 
 ### Future provider TODO (outside this milestone)
+
+- [ ] Validate a maintainer-chosen live Invidious instance before the next release.
 
 - [ ] Opt-in/configurable SponsorBlock segments (sponsor, intro, outro, self-promotion).
 - [ ] Combined Deezer + YouTube search.

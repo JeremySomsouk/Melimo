@@ -73,3 +73,20 @@ with `SNG_ID`. It exposes `LYRICS_SYNC_JSON`, `LYRICS_TEXT`,
 millisecond timestamps into original Rust models. Tests use invented demo lines;
 no provider lyrics or private responses are stored in this repository.
 
+
+## YouTube / Invidious audio (2026-09-25)
+
+The [official Invidious API documentation](https://docs.invidious.io/api/) was
+consulted for `GET /api/v1/search` with `q` and `type=video`, and
+`GET /api/v1/videos/:id`. The implementation maps videoId, title, author and
+lengthSeconds, and resolves audio-only AAC-LC from adaptiveFormats (type, bitrate,
+url). No website/player, extraction code, account responses or public instance
+configuration is embedded. Tests use a loopback API and original generated audio.
+Rodio's existing Symphonia decoder gains the AAC and ISO MP4 feature flags;
+nonseekable MP3 and M4A decoding/forward discard are verified by fixtures.
+
+Metadata requests set `local=true` to ask the configured instance for proxied
+stream URLs, avoiding direct URLs bound to the instance's upstream IP. This API
+parameter was verified in the upstream
+[video route](https://github.com/iv-org/invidious/blob/master/src/invidious/routes/api/v1/videos.cr)
+and [API change #3567](https://github.com/iv-org/invidious/pull/3567).

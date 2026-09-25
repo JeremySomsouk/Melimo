@@ -381,6 +381,50 @@ mod tests {
     use super::*;
     use ratatui::{Terminal, backend::TestBackend};
     #[test]
+    fn provider_labels_follow_results_queue_and_player() {
+        use crate::provider::{ProviderId, Track};
+        let track = Track {
+            provider: ProviderId::YouTube,
+            id: "abcdefghijk".into(),
+            title: "Synthetic video".into(),
+            artist: "Channel".into(),
+            album: String::new(),
+            duration_secs: 120,
+        };
+        let mut app = App::default();
+        app.search_provider = ProviderId::YouTube;
+        app.tracks = vec![track.clone()];
+        app.queue = vec![track.clone()].into();
+        app.opened = Some(track);
+        app.selected = Some(0);
+        app.searched = true;
+        for width in [40, 60, 100] {
+            for view in [View::Search, View::Queue, View::NowPlaying] {
+                app.view = view;
+                let mut terminal = Terminal::new(TestBackend::new(width, 24)).unwrap();
+                terminal
+                    .draw(|f| {
+                        render(
+                            f,
+                            &app,
+                            app.search_provider.name(),
+                            &mut TableState::default(),
+                        )
+                    })
+                    .unwrap();
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|c| c.symbol())
+                    .collect();
+                assert!(text.contains("[YT]"));
+                assert!(text.contains("Channel"));
+            }
+        }
+    }
+    #[test]
     fn renders_small_and_normal_terminals() {
         for (width, height) in [(1, 1), (20, 5), (80, 24)] {
             let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();

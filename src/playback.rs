@@ -395,8 +395,16 @@ mod tests {
     #[test]
     #[ignore = "requires an audio device; plays a generated quarter-second tone"]
     fn audio_device_smoke() {
+        audio_device_fixture(include_bytes!("../tests/fixtures/tone.mp3"));
+    }
+    #[test]
+    #[ignore = "requires an audio device; plays a generated quarter-second AAC tone"]
+    fn audio_device_m4a_smoke() {
+        audio_device_fixture(include_bytes!("../tests/fixtures/tone.m4a"));
+    }
+    fn audio_device_fixture(bytes: &'static [u8]) {
         let (tx, rx) = mpsc::channel(32);
-        for chunk in include_bytes!("../tests/fixtures/tone.mp3").chunks(2048) {
+        for chunk in bytes.chunks(2048) {
             tx.try_send(chunk.to_vec()).unwrap();
         }
         drop(tx);

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Configurable anonymous YouTube/Invidious audio search and AAC/M4A playback.
+- Provider-aware results and mixed queue; `P` switches search provider.
+- Shared transport controls and bounded audio pipeline for both providers.
+- Validated TOML settings, explicit provider errors and one expired-URL refresh.
+- Synthetic HTTP, decoder, provider-routing and queue regression coverage.
+
 ## 0.1.0 — 2026-09-24
 
 - Rust terminal player with Deezer search, discovery, playlists, favorites and Flow.

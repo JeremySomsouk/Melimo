@@ -10,7 +10,7 @@ Search, explore playlists, build a queue and follow synchronized lyrics from the
 ## Features
 
 - Deezer track and playlist search, personal playlists, favorites and Flow.
-- Invidious audio search through a configurable Invidious-compatible instance.
+- Invidious audio search with automatic instance discovery and audio throughput selection.
 - MP3 and AAC/M4A playback, pause/resume, volume/mute, mixed queue, shuffle and next track.
 - Progress display and 10-second backward/forward seeking.
 - Line-synchronized lyrics when available, with plain-text fallback and credits.

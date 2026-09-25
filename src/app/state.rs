@@ -303,7 +303,8 @@ impl App {
                 if self.search_provider == ProviderId::Invidious {
                     self.view = View::Search;
                     self.selected = (!self.tracks.is_empty()).then_some(0);
-                    self.notice = Some("Invidious: / to search videos · P switches provider.".into());
+                    self.notice =
+                        Some("Invidious: / to search videos · P switches provider.".into());
                 }
             }
             Action::ToggleSearchKind => {

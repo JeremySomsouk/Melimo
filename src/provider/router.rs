@@ -31,9 +31,9 @@ impl Providers {
             .ok_or_else(|| "Deezer is not connected. Start melimo --login to enable it.".into())
     }
     fn invidious(&self) -> Result<&AutomaticProvider, String> {
-        self.invidious
-            .as_ref()
-            .ok_or_else(|| "Invidious is disabled. Configure [invidious] and restart Mélimo.".into())
+        self.invidious.as_ref().ok_or_else(|| {
+            "Invidious is disabled. Configure [invidious] and restart Mélimo.".into()
+        })
     }
     pub async fn search(&self, provider: ProviderId, query: String) -> Result<Vec<Track>, String> {
         match provider {

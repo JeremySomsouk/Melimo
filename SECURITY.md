@@ -29,7 +29,7 @@ limited, stalled connections time out, and raw network errors are not displayed.
 Provider metadata is stripped of terminal controls; terminal titles also receive
 a final control-character filter and length bound.
 
-Invidious uses a separately configured, anonymous Invidious client with no cookie
+Invidious uses an anonymous client with no cookie
 jar or account headers. Instance settings accept HTTP(S); use HTTPS for remote
 instances. Stream hosts are supplied by the chosen instance, and redirects are
 limited to five hops. Choose infrastructure you trust: searches go to the instance

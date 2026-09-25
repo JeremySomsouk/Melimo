@@ -77,7 +77,9 @@ async fn start() -> Result<(), String> {
         let settings = config::invidious::Settings::load()?;
         let invidious = if settings.invidious.enabled {
             Some(AutomaticProvider::new(settings.invidious.instance()?)?)
-        } else { None };
+        } else {
+            None
+        };
         let invidious_only = args.first().is_some_and(|arg| arg == "--invidious");
         if invidious_only && invidious.is_none() {
             return Err("Invidious is disabled. Set [invidious] enabled = true in your Mélimo configuration.".into());

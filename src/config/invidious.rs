@@ -17,7 +17,12 @@ pub struct InvidiousSettings {
 }
 
 impl Default for InvidiousSettings {
-    fn default() -> Self { Self { enabled: true, invidious_instance: String::new() } }
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            invidious_instance: String::new(),
+        }
+    }
 }
 
 impl Settings {

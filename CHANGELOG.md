@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Configurable anonymous YouTube/Invidious audio search and AAC/M4A playback.
+- Configurable anonymous Invidious/Invidious audio search and AAC/M4A playback.
 - Provider-aware results and mixed queue; `P` switches search provider.
 - Shared transport controls and bounded audio pipeline for both providers.
 - Validated TOML settings, explicit provider errors and one expired-URL refresh.

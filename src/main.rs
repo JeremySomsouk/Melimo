@@ -6,7 +6,7 @@ mod tui;
 
 use provider::{
     deezer::{DeezerError, DeezerProvider},
-    invidious::InvidiousProvider,
+    invidious::AutomaticProvider,
     router::Providers,
 };
 use std::{
@@ -29,7 +29,7 @@ async fn start() -> Result<(), String> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
         println!(
-            "Mélimo — unofficial streaming-only terminal music client\n\nUsage: melimo [--mock | --youtube | --check-auth | --login | --forget | --version]\n\nDefault: Deezer search using DEEZER_ARL or the saved login.\n--youtube: anonymous YouTube audio via configured Invidious instance.\n--mock: offline demo with fictional tracks.\n--check-auth: validate credentials without opening the TUI.\n--login: open browser sign-in; saves your ARL cookie (0600) for next launch.\n--forget: delete the saved ARL cookie.\n--version: print the version and exit.\n\nSet MELIMO_NO_STORE=1 to never write the saved login.\nSet MELIMO_CONFIG to a TOML settings file; see README for [youtube].\nEnter plays a selected track. P switches search provider. Space pauses/resumes; s stops."
+            "Mélimo — unofficial streaming-only terminal music client\n\nUsage: melimo [--mock | --invidious | --check-auth | --login | --forget | --version]\n\nDefault: Deezer search using DEEZER_ARL or the saved login.\n--invidious: anonymous Invidious audio with automatic instance selection.\n--mock: offline demo with fictional tracks.\n--check-auth: validate credentials without opening the TUI.\n--login: open browser sign-in; saves your ARL cookie (0600) for next launch.\n--forget: delete the saved ARL cookie.\n--version: print the version and exit.\n\nSet MELIMO_NO_STORE=1 to never write the saved login.\nSet MELIMO_CONFIG to a TOML settings file; see README for [invidious].\nEnter plays a selected track. P switches search provider. Space pauses/resumes; s stops."
         );
         return Ok(());
     }
@@ -40,7 +40,7 @@ async fn start() -> Result<(), String> {
     if args.len() > 1
         || args.first().is_some_and(|arg| {
             arg != "--mock"
-                && arg != "--youtube"
+                && arg != "--invidious"
                 && arg != "--check-auth"
                 && arg != "--version"
                 && arg != "--login"
@@ -74,24 +74,22 @@ async fn start() -> Result<(), String> {
             ..Default::default()
         })
     } else {
-        let settings = config::youtube::Settings::load()?;
-        let youtube = settings
-            .youtube
-            .instance()?
-            .map(InvidiousProvider::new)
-            .transpose()?;
-        let youtube_only = args.first().is_some_and(|arg| arg == "--youtube");
-        if youtube_only && youtube.is_none() {
-            return Err("YouTube is disabled. Set [youtube] enabled = true and invidious_instance in your Mélimo configuration.".into());
+        let settings = config::invidious::Settings::load()?;
+        let invidious = if settings.invidious.enabled {
+            Some(AutomaticProvider::new(settings.invidious.instance()?)?)
+        } else { None };
+        let invidious_only = args.first().is_some_and(|arg| arg == "--invidious");
+        if invidious_only && invidious.is_none() {
+            return Err("Invidious is disabled. Set [invidious] enabled = true in your Mélimo configuration.".into());
         }
-        let deezer = if youtube_only {
+        let deezer = if invidious_only {
             None
         } else {
             Some(connect(&args).await?)
         };
         run(Providers {
             deezer,
-            youtube,
+            invidious,
             mock: false,
         })
     }

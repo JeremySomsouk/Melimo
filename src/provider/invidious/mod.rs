@@ -1,4 +1,6 @@
-//! Anonymous Invidious API access, separate from stream resolution and transport.
+mod automatic;
+pub use automatic::AutomaticProvider;
+// Anonymous Invidious API access, separate from stream resolution and transport.
 use super::{AudioStream, MusicProvider, ProviderId, StreamResolver, Track};
 use reqwest::{Client, Response, StatusCode, Url};
 use serde::Deserialize;
@@ -38,12 +40,12 @@ impl Video {
         validate_id(&self.video_id)?;
         if self.live_now || self.is_upcoming || self.length_seconds == 0 {
             return Err(
-                "YouTube live and upcoming streams are not supported yet. Choose a recorded video."
+                "Invidious live and upcoming streams are not supported yet. Choose a recorded video."
                     .into(),
             );
         }
         Ok(Track {
-            provider: ProviderId::YouTube,
+            provider: ProviderId::Invidious,
             id: self.video_id.clone(),
             title: display_text(&self.title),
             artist: display_text(&self.author),
@@ -67,7 +69,7 @@ fn validate_id(id: &str) -> Result<(), String> {
     {
         Ok(())
     } else {
-        Err("Invalid YouTube video identifier.".into())
+        Err("Invalid Invidious video identifier.".into())
     }
 }
 fn network_error(error: reqwest::Error) -> String {
@@ -85,10 +87,10 @@ fn status_error(status: StatusCode) -> Result<(), String> {
     Err(match status {
         StatusCode::TOO_MANY_REQUESTS => "Invidious rate limit reached. Wait before retrying.",
         StatusCode::NOT_FOUND | StatusCode::GONE => {
-            "YouTube video or Invidious endpoint is unavailable."
+            "Invidious video or Invidious endpoint is unavailable."
         }
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-            "YouTube access denied: the video may have age, region or account restrictions."
+            "Invidious access denied: the video may have age, region or account restrictions."
         }
         _ => "Invidious returned an HTTP error. Retry or check your configured instance.",
     }
@@ -128,8 +130,8 @@ impl InvidiousProvider {
             // Classify without displaying upstream text/URLs or private instance details.
             let message = error.as_str().unwrap_or_default().to_ascii_lowercase();
             return Err(if message.contains("age") || message.contains("region") || message.contains("country") || message.contains("sign in") || message.contains("private") || message.contains("restrict") {
-                "YouTube video is restricted (age, region or account). Choose another video."
-            } else { "YouTube video is unavailable or the instance could not retrieve it. Try another video or instance." }.into());
+                "Invidious video is restricted (age, region or account). Choose another video."
+            } else { "Invidious video is unavailable or the instance could not retrieve it. Try another video or instance." }.into());
         }
         Ok(value)
     }
@@ -172,7 +174,7 @@ impl InvidiousProvider {
                 response.status(),
                 StatusCode::FORBIDDEN | StatusCode::GONE | StatusCode::UNAUTHORIZED
             ) {
-                return Err("YouTube audio URL expired or access was denied after refresh. Try another video or instance.".into());
+                return Err("Invidious audio URL expired or access was denied after refresh. Try another video or instance.".into());
             }
         }
         status_error(response.status())?;
@@ -188,7 +190,7 @@ impl InvidiousProvider {
         }
         if received == 0 || expected.is_some_and(|size| received != size) {
             return Err(
-                "YouTube audio stream ended unexpectedly. Select the item to retry.".into(),
+                "Invidious audio stream ended unexpectedly. Select the item to retry.".into(),
             );
         }
         Ok(())
@@ -197,7 +199,7 @@ impl InvidiousProvider {
 
 impl StreamResolver for InvidiousProvider {
     async fn resolve_audio(&self, item: &Track) -> Result<AudioStream, String> {
-        if item.provider != ProviderId::YouTube {
+        if item.provider != ProviderId::Invidious {
             return Err("Invidious cannot resolve this media provider.".into());
         }
         let video = self.metadata(&item.id).await?;
@@ -224,7 +226,7 @@ impl StreamResolver for InvidiousProvider {
                 return Ok(AudioStream { url });
             }
         }
-        Err("YouTube has no usable audio-only AAC/M4A format. Try another video or Invidious instance.".into())
+        Err("Invidious has no usable audio-only AAC/M4A format. Try another video or Invidious instance.".into())
     }
 }
 

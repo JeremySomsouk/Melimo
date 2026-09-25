@@ -370,7 +370,7 @@ mod tests {
         let player = Playback::start(
             providers,
             Track {
-                provider: crate::provider::ProviderId::YouTube,
+                provider: crate::provider::ProviderId::Invidious,
                 id: "abcdefghijk".into(),
                 title: "Synthetic".into(),
                 artist: "Channel".into(),
@@ -388,7 +388,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(
-            matches!(action, Action::PlaybackUpdate { id: 7, state: PlaybackState::Error(e), .. } if e.contains("YouTube is disabled"))
+            matches!(action, Action::PlaybackUpdate { id: 7, state: PlaybackState::Error(e), .. } if e.contains("Invidious is disabled"))
         );
         drop(player);
     }

@@ -74,7 +74,7 @@ millisecond timestamps into original Rust models. Tests use invented demo lines;
 no provider lyrics or private responses are stored in this repository.
 
 
-## YouTube / Invidious audio (2026-09-25)
+## Invidious audio (2026-09-25)
 
 The [official Invidious API documentation](https://docs.invidious.io/api/) was
 consulted for `GET /api/v1/search` with `q` and `type=video`, and

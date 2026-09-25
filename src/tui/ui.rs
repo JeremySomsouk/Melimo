@@ -384,7 +384,7 @@ mod tests {
     fn provider_labels_follow_results_queue_and_player() {
         use crate::provider::{ProviderId, Track};
         let track = Track {
-            provider: ProviderId::YouTube,
+            provider: ProviderId::Invidious,
             id: "abcdefghijk".into(),
             title: "Synthetic video".into(),
             artist: "Channel".into(),
@@ -392,7 +392,7 @@ mod tests {
             duration_secs: 120,
         };
         let mut app = App::default();
-        app.search_provider = ProviderId::YouTube;
+        app.search_provider = ProviderId::Invidious;
         app.tracks = vec![track.clone()];
         app.queue = vec![track.clone()].into();
         app.opened = Some(track);
@@ -419,7 +419,7 @@ mod tests {
                     .iter()
                     .map(|c| c.symbol())
                     .collect();
-                assert!(text.contains("[YT]"));
+                assert!(text.contains("[INV]"));
                 assert!(text.contains("Channel"));
             }
         }

@@ -1,5 +1,5 @@
 pub mod store;
-pub mod youtube;
+pub mod invidious;
 
 use std::{env, fmt};
 

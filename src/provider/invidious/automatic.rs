@@ -1,0 +1,185 @@
+//! Lazy discovery and bounded measurements of actual audio delivery.
+use super::*;
+use std::time::Instant;
+use tokio::sync::Mutex;
+
+const REGISTRY: &str = "https://api.invidious.io/instances.json?sort_by=health";
+const CACHE_TTL: Duration = Duration::from_secs(600);
+const PROBE_BYTES: usize = 64 * 1024;
+
+pub struct AutomaticProvider {
+    fixed: Option<InvidiousProvider>,
+    discovery: InvidiousProvider,
+    cache: Mutex<Option<(Instant, Vec<Url>)>>,
+}
+
+impl AutomaticProvider {
+    pub fn new(instance: Option<Url>) -> Result<Self, String> {
+        Ok(Self {
+            fixed: instance.map(InvidiousProvider::new).transpose()?,
+            discovery: InvidiousProvider::new(Url::parse(REGISTRY).map_err(|_| "Invalid registry URL.")?)?,
+            cache: Mutex::new(None),
+        })
+    }
+
+    async fn candidates(&self) -> Result<Vec<Url>, String> {
+        let mut cache = self.cache.lock().await;
+        if let Some((at, urls)) = cache.as_ref()
+            && at.elapsed() < CACHE_TTL
+        {
+            return Ok(urls.clone());
+        }
+        let value = self.discovery.json(self.discovery.instance.clone()).await?;
+        let urls = registry_urls(&value);
+        if urls.is_empty() {
+            return Err("No HTTPS Invidious API instances are available. Retry later or configure an instance.".into());
+        }
+        *cache = Some((Instant::now(), urls.clone()));
+        Ok(urls)
+    }
+
+    async fn failed(&self, url: &Url) {
+        let mut cache = self.cache.lock().await;
+        if let Some((_, urls)) = cache.as_mut() {
+            urls.retain(|candidate| candidate != url);
+            if urls.is_empty() { *cache = None; }
+        }
+    }
+
+    pub async fn search_tracks(&self, query: String) -> Result<Vec<Track>, String> {
+        if query.trim().is_empty() { return Ok(Vec::new()); }
+        if let Some(provider) = &self.fixed {
+            return provider.search_tracks(query).await;
+        }
+        for url in self.candidates().await? {
+            let provider = InvidiousProvider::new(url.clone())?;
+            match tokio::time::timeout(Duration::from_secs(4), provider.search_tracks(query.clone())).await {
+                Ok(Ok(tracks)) => return Ok(tracks),
+                _ => self.failed(&url).await,
+            }
+        }
+        Err("No discovered Invidious instance could search. Retry later or configure an instance.".into())
+    }
+
+    pub async fn stream(&self, item: &Track, audio: mpsc::Sender<Vec<u8>>) -> Result<(), String> {
+        if let Some(provider) = &self.fixed {
+            return provider.stream(item, audio).await;
+        }
+        // At most three concurrent requests targeting 64 KiB per candidate. Keep the
+        // response open so the winning probe becomes playback without redownloading.
+        let mut best = None;
+        for batch in self.candidates().await?.chunks(3) {
+        let mut probes = tokio::task::JoinSet::new();
+        for url in batch.iter().cloned() {
+            let item = item.clone();
+            probes.spawn(async move {
+                let result = tokio::time::timeout(Duration::from_secs(6), probe(url.clone(), &item)).await;
+                (url, result)
+            });
+        }
+        while let Some(result) = probes.join_next().await {
+            if let Ok((url, result)) = result {
+                match result {
+                    Ok(Ok(sample)) => {
+                        if best.as_ref().is_none_or(|previous: &Sample| sample.bytes_per_second > previous.bytes_per_second) {
+                            best = Some(sample);
+                        }
+                    }
+                    _ => self.failed(&url).await,
+                }
+            }
+        }
+        if best.is_some() { break; }
+        }
+        let Some(mut sample) = best else {
+            return Err("No discovered instance could deliver audio. Retry later or configure an instance.".into());
+        };
+        let expected = sample.response.content_length();
+        let mut received = sample.prefix.len() as u64;
+        for bytes in sample.prefix.chunks(2048) {
+            if audio.send(bytes.to_vec()).await.is_err() { return Ok(()); }
+        }
+        loop {
+            let chunk = match sample.response.chunk().await {
+                Ok(chunk) => chunk,
+                Err(error) => {
+                    self.failed(&sample.instance).await;
+                    return Err(network_error(error));
+                }
+            };
+            let Some(chunk) = chunk else { break; };
+            received += chunk.len() as u64;
+            for bytes in chunk.chunks(2048) {
+                if audio.send(bytes.to_vec()).await.is_err() { return Ok(()); }
+            }
+        }
+        if received == 0 || expected.is_some_and(|size| size != received) {
+            self.failed(&sample.instance).await;
+            return Err("Audio stream ended unexpectedly. Select the item to retry.".into());
+        }
+        Ok(())
+    }
+}
+
+struct Sample {
+    instance: Url,
+    response: Response,
+    prefix: Vec<u8>,
+    bytes_per_second: f64,
+}
+
+async fn probe(instance: Url, item: &Track) -> Result<Sample, String> {
+    let provider = InvidiousProvider::new(instance.clone())?;
+    let source = provider.resolve_audio(item).await?;
+    let start = Instant::now();
+    let mut response = provider.open_stream(source).await?;
+    status_error(response.status())?;
+    let mut prefix = Vec::new();
+    while prefix.len() < PROBE_BYTES {
+        let Some(chunk) = response.chunk().await.map_err(network_error)? else { break; };
+        if prefix.len() + chunk.len() > 256 * 1024 {
+            return Err("Audio probe exceeded its buffer limit.".into());
+        }
+        prefix.extend_from_slice(&chunk);
+    }
+    if prefix.is_empty() { return Err("Empty audio stream.".into()); }
+    let bytes_per_second = prefix.len() as f64 / start.elapsed().as_secs_f64().max(0.001);
+    Ok(Sample { instance, response, prefix, bytes_per_second })
+}
+
+fn registry_urls(value: &serde_json::Value) -> Vec<Url> {
+    let Some(rows) = value.as_array() else { return Vec::new(); };
+    let mut urls = Vec::new();
+    for row in rows.iter().take(200) {
+        let Some(info) = row.get(1) else { continue; };
+        if info.get("api").and_then(|v| v.as_bool()) != Some(true) { continue; }
+        let Some(uri) = info.get("uri").and_then(|v| v.as_str()) else { continue; };
+        let Ok(url) = crate::config::invidious::validate_url(uri) else { continue; };
+        if url.scheme() == "https" && !urls.contains(&url) {
+            urls.push(url);
+            if urls.len() == 6 { break; }
+        }
+    }
+    urls
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn registry_filters_disabled_insecure_and_duplicate_instances() {
+        let entries = serde_json::json!([
+            ["one", {"api":true,"uri":"https://one.invalid"}],
+            ["duplicate", {"api":true,"uri":"https://one.invalid/"}],
+            ["disabled", {"api":false,"uri":"https://disabled.invalid"}],
+            ["http", {"api":true,"uri":"http://http.invalid"}],
+            ["credentials", {"api":true,"uri":"https://user:password@bad.invalid"}],
+            ["two", {"api":true,"uri":"https://two.invalid"}]
+        ]);
+        let urls = registry_urls(&entries);
+        assert_eq!(urls.len(), 2);
+        assert_eq!(urls[0].as_str(), "https://one.invalid/");
+        assert_eq!(urls[1].as_str(), "https://two.invalid/");
+        assert!(registry_urls(&serde_json::json!({})).is_empty());
+    }
+}

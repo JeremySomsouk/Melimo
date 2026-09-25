@@ -10,7 +10,7 @@ use std::future::Future;
 pub enum ProviderId {
     #[default]
     Deezer,
-    YouTube,
+    Invidious,
     Mock,
 }
 
@@ -18,14 +18,14 @@ impl ProviderId {
     pub fn label(self) -> &'static str {
         match self {
             Self::Deezer => "DZR",
-            Self::YouTube => "YT",
+            Self::Invidious => "INV",
             Self::Mock => "DEMO",
         }
     }
     pub fn name(self) -> &'static str {
         match self {
             Self::Deezer => "Deezer",
-            Self::YouTube => "YouTube / Invidious",
+            Self::Invidious => "Invidious",
             Self::Mock => "Mock · offline",
         }
     }
@@ -37,9 +37,9 @@ mod model_tests {
 
     #[test]
     fn provider_identity_is_explicit_and_labels_are_distinct() {
-        assert_ne!(ProviderId::Deezer, ProviderId::YouTube);
-        assert_ne!(ProviderId::Deezer.label(), ProviderId::YouTube.label());
-        assert_eq!(ProviderId::YouTube.name(), "YouTube / Invidious");
+        assert_ne!(ProviderId::Deezer, ProviderId::Invidious);
+        assert_ne!(ProviderId::Deezer.label(), ProviderId::Invidious.label());
+        assert_eq!(ProviderId::Invidious.name(), "Invidious");
     }
 }
 

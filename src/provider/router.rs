@@ -1,14 +1,14 @@
 //! Provider routing belongs here, never in the player or queue.
 use super::{
     BrowseKind, BrowseResults, Lyrics, MusicProvider, ProviderId, Track, deezer::DeezerProvider,
-    invidious::InvidiousProvider, mock::MockProvider,
+    invidious::AutomaticProvider, mock::MockProvider,
 };
 use tokio::sync::mpsc;
 
 #[derive(Default)]
 pub struct Providers {
     pub deezer: Option<DeezerProvider>,
-    pub youtube: Option<InvidiousProvider>,
+    pub invidious: Option<AutomaticProvider>,
     pub mock: bool,
 }
 impl Providers {
@@ -20,8 +20,8 @@ impl Providers {
         if self.deezer.is_some() {
             ids.push(ProviderId::Deezer);
         }
-        if self.youtube.is_some() {
-            ids.push(ProviderId::YouTube);
+        if self.invidious.is_some() {
+            ids.push(ProviderId::Invidious);
         }
         ids
     }
@@ -30,15 +30,15 @@ impl Providers {
             .as_ref()
             .ok_or_else(|| "Deezer is not connected. Start melimo --login to enable it.".into())
     }
-    fn youtube(&self) -> Result<&InvidiousProvider, String> {
-        self.youtube
+    fn invidious(&self) -> Result<&AutomaticProvider, String> {
+        self.invidious
             .as_ref()
-            .ok_or_else(|| "YouTube is disabled. Configure [youtube] and restart Mélimo.".into())
+            .ok_or_else(|| "Invidious is disabled. Configure [invidious] and restart Mélimo.".into())
     }
     pub async fn search(&self, provider: ProviderId, query: String) -> Result<Vec<Track>, String> {
         match provider {
             ProviderId::Deezer => self.deezer()?.search_tracks(query).await,
-            ProviderId::YouTube => self.youtube()?.search_tracks(query).await,
+            ProviderId::Invidious => self.invidious()?.search_tracks(query).await,
             ProviderId::Mock if self.mock => MockProvider.search_tracks(query).await,
             ProviderId::Mock => Err("Offline demo is not enabled.".into()),
         }
@@ -58,7 +58,7 @@ impl Providers {
     pub async fn stream(&self, item: Track, audio: mpsc::Sender<Vec<u8>>) -> Result<(), String> {
         match item.provider {
             ProviderId::Deezer => self.deezer()?.stream_track(item.id, audio).await,
-            ProviderId::YouTube => self.youtube()?.stream(&item, audio).await,
+            ProviderId::Invidious => self.invidious()?.stream(&item, audio).await,
             ProviderId::Mock => MockProvider.stream_track(item.id, audio).await,
         }
     }
@@ -99,7 +99,7 @@ mod tests {
         );
         assert!(
             providers
-                .search(ProviderId::YouTube, "test".into())
+                .search(ProviderId::Invidious, "test".into())
                 .await
                 .unwrap_err()
                 .contains("disabled")
@@ -109,7 +109,7 @@ mod tests {
             .await
             .unwrap()
             .remove(0);
-        item.provider = ProviderId::YouTube;
+        item.provider = ProviderId::Invidious;
         assert!(providers.lyrics(item.clone()).await.is_err());
         assert!(providers.toggle_favorite(item.clone()).await.is_err());
         let (tx, _rx) = mpsc::channel(1);

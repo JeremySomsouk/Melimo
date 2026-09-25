@@ -115,7 +115,7 @@ async fn search_metadata_resolve_and_stream_use_one_anonymous_pipeline() {
     let provider = server.provider();
     let tracks = provider.search_tracks("hello & café".into()).await.unwrap();
     assert_eq!(tracks.len(), 1);
-    assert_eq!(tracks[0].provider, ProviderId::YouTube);
+    assert_eq!(tracks[0].provider, ProviderId::Invidious);
     assert_eq!(tracks[0].title, "Title");
     let (tx, mut rx) = mpsc::channel(2);
     let collect = tokio::spawn(async move {

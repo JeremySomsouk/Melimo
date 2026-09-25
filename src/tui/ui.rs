@@ -59,7 +59,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             Table::new(
                 app.queue.iter().map(|t| {
                     Row::new([
-                        t.title.clone(),
+                        format!("[{}] {}", t.provider.label(), t.title),
                         t.artist.clone(),
                         format_time(t.duration_secs),
                     ])
@@ -90,9 +90,15 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             .areas(inner);
             frame.render_widget(
                 Paragraph::new(vec![
-                    Line::styled(track.title.clone(), theme::title()),
+                    Line::styled(
+                        format!("[{}] {}", track.provider.label(), track.title),
+                        theme::title(),
+                    ),
                     Line::styled(track.artist.clone(), theme::base()),
-                    Line::styled(track.album.clone(), theme::muted()),
+                    Line::styled(
+                        format!("{} · {}", track.provider.name(), track.album),
+                        theme::muted(),
+                    ),
                     Line::styled(
                         playback_label(app),
                         if matches!(app.playback, PlaybackState::Error(_)) {
@@ -279,7 +285,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
         } else {
             let rows = app.tracks.iter().map(|track| {
                 Row::new(vec![
-                    track.title.clone(),
+                    format!("[{}] {}", track.provider.label(), track.title),
                     track.artist.clone(),
                     format_time(track.duration_secs),
                 ])
@@ -393,6 +399,7 @@ mod tests {
         let mut app = App::default();
         app.update(crate::app::action::Action::ToggleLyrics);
         app.opened = Some(Track {
+            provider: crate::provider::ProviderId::Mock,
             id: "demo".into(),
             title: "Demo".into(),
             artist: "Demo".into(),

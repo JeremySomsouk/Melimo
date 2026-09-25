@@ -3,8 +3,47 @@ pub mod mock;
 
 use std::future::Future;
 
+/// Identity travels with every item, including snapshots in a mixed queue.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ProviderId {
+    #[default]
+    Deezer,
+    YouTube,
+    Mock,
+}
+
+impl ProviderId {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Deezer => "DZR",
+            Self::YouTube => "YT",
+            Self::Mock => "DEMO",
+        }
+    }
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Deezer => "Deezer",
+            Self::YouTube => "YouTube / Invidious",
+            Self::Mock => "Mock · offline",
+        }
+    }
+}
+
+#[cfg(test)]
+mod model_tests {
+    use super::*;
+
+    #[test]
+    fn provider_identity_is_explicit_and_labels_are_distinct() {
+        assert_ne!(ProviderId::Deezer, ProviderId::YouTube);
+        assert_ne!(ProviderId::Deezer.label(), ProviderId::YouTube.label());
+        assert_eq!(ProviderId::YouTube.name(), "YouTube / Invidious");
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Track {
+    pub provider: ProviderId,
     pub id: String,
     pub title: String,
     pub artist: String,

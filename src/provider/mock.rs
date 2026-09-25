@@ -62,6 +62,7 @@ fn catalog() -> Vec<Track> {
     .into_iter()
     .enumerate()
     .map(|(index, (title, artist, album, duration_secs))| Track {
+        provider: crate::provider::ProviderId::Mock,
         id: format!("mock:{index}"),
         title: title.into(),
         artist: artist.into(),

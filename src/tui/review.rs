@@ -15,6 +15,7 @@ use std::time::Instant;
 fn synthetic_render_review() {
     let mut app = App::default();
     app.opened = Some(Track {
+        provider: crate::provider::ProviderId::Mock,
         id: "synthetic".into(),
         title: "A little closer to the stars".into(),
         artist: "The Imaginary Orchestra".into(),
@@ -45,6 +46,7 @@ fn synthetic_render_review() {
     }));
     app.queue = (0..1000)
         .map(|i| Track {
+            provider: crate::provider::ProviderId::Mock,
             id: i.to_string(),
             title: format!("Synthetic track {i:04}"),
             artist: "Demo artist".into(),

@@ -16,6 +16,12 @@
 Initial scope: provider-specific search and audio-only playback. No browser player,
 authentication, video renderer or SponsorBlock integration for YouTube.
 
+Checkpoint: tracks now carry explicit provider identity; queue snapshots and TUI
+labels preserve it. All existing tests plus mixed-provider queue/transport tests
+pass. Keep the existing `Track` model (including Deezer album display); add only
+the identity needed for routing. Resolution will select audio-only AAC/M4A and
+feed the existing bounded decoder/player, without an external runtime extractor.
+
 ### Future provider TODO (outside this milestone)
 
 - [ ] Opt-in/configurable SponsorBlock segments (sponsor, intro, outro, self-promotion).

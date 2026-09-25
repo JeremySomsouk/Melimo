@@ -505,12 +505,37 @@ mod tests {
 
     fn track() -> Track {
         Track {
+            provider: crate::provider::ProviderId::Mock,
             id: "mock:0".into(),
             title: "Title".into(),
             artist: "Artist".into(),
             album: "Album".into(),
             duration_secs: 123,
         }
+    }
+
+    #[test]
+    fn mixed_queue_preserves_provider_even_when_ids_match() {
+        let mut deezer = track();
+        deezer.provider = crate::provider::ProviderId::Deezer;
+        let mut youtube = deezer.clone();
+        youtube.provider = crate::provider::ProviderId::YouTube;
+        let mut app = App {
+            tracks: vec![deezer.clone(), youtube.clone()],
+            selected: Some(0),
+            ..App::default()
+        };
+        app.update(Action::PlayAll);
+        assert_eq!(app.opened.as_ref(), Some(&deezer));
+        app.tracks.clear();
+        app.update(Action::NextTrack);
+        assert_eq!(app.opened.as_ref(), Some(&youtube));
+        app.update(Action::TogglePause);
+        app.update(Action::SeekRelative(10));
+        assert!(app.pause_requested);
+        assert_eq!(app.opened.as_ref(), Some(&youtube));
+        app.update(Action::StopPlayback);
+        assert!(app.queue.is_empty());
     }
 
     #[test]

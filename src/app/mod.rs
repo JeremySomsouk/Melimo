@@ -298,6 +298,7 @@ mod tests {
         let mut app = App::default();
         assert_eq!(terminal_title(&app), "Mélimo");
         app.opened = Some(crate::provider::Track {
+            provider: crate::provider::ProviderId::Mock,
             id: "1".into(),
             title: "Song".into(),
             artist: "Artist".into(),

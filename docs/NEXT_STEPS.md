@@ -13,8 +13,8 @@
 
 No public media instance is hard-coded. Throughput is a short observation, not a
 promise of maximum bandwidth. Mid-stream failures require retry to avoid joining
-incompatible encodings or repeating audio. Registry filtering has a focused unit
-test. Further HTTP failover and delayed-stream integration coverage is pending.
+incompatible encodings or repeating audio. Focused tests cover registry filtering, lazy empty search, explicit overrides,
+HTTP failover/cache eviction, faster audio selection and exact probe continuation.
 
 ## COMPLETE — Invidious audio provider (2026-09-25)
 

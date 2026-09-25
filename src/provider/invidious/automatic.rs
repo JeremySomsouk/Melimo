@@ -117,7 +117,7 @@ impl AutomaticProvider {
                     .into(),
             );
         };
-        let expected = sample.response.content_length();
+        let expected = sample.expected;
         let mut received = sample.prefix.len() as u64;
         for bytes in sample.prefix.chunks(2048) {
             if audio.send(bytes.to_vec()).await.is_err() {
@@ -154,6 +154,7 @@ struct Sample {
     instance: Url,
     response: Response,
     prefix: Vec<u8>,
+    expected: Option<u64>,
     bytes_per_second: f64,
 }
 
@@ -163,6 +164,7 @@ async fn probe(instance: Url, item: &Track) -> Result<Sample, String> {
     let start = Instant::now();
     let mut response = provider.open_stream(source).await?;
     status_error(response.status())?;
+    let expected = response.content_length();
     let mut prefix = Vec::new();
     while prefix.len() < PROBE_BYTES {
         let Some(chunk) = response.chunk().await.map_err(network_error)? else {
@@ -181,6 +183,7 @@ async fn probe(instance: Url, item: &Track) -> Result<Sample, String> {
         instance,
         response,
         prefix,
+        expected,
         bytes_per_second,
     })
 }

@@ -245,7 +245,8 @@ mod tests {
             let (mut socket, _) = bad.accept().await.unwrap();
             let mut request = [0; 4096];
             socket.read(&mut request).await.unwrap();
-            let reply = b"HTTP/1.1 503 Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+            let reply =
+                b"HTTP/1.1 503 Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
             socket.write_all(reply).await.unwrap();
         });
         let second = tokio::spawn(async move {
@@ -273,10 +274,83 @@ mod tests {
     #[tokio::test]
     async fn empty_search_does_not_discover_and_explicit_instance_is_preserved() {
         let provider = AutomaticProvider::new(None).unwrap();
-        assert!(provider.search_tracks(String::new()).await.unwrap().is_empty());
+        assert!(
+            provider
+                .search_tracks(String::new())
+                .await
+                .unwrap()
+                .is_empty()
+        );
         assert!(provider.cache.lock().await.is_none());
         let url = Url::parse("https://explicit.invalid/").unwrap();
         let fixed = AutomaticProvider::new(Some(url.clone())).unwrap();
         assert_eq!(fixed.fixed.unwrap().instance, url);
+    }
+
+    async fn audio_server(delay_ms: u64, byte: u8) -> (Url, tokio::task::JoinHandle<()>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let source = url.join("audio").unwrap().to_string();
+        let task = tokio::spawn(async move {
+            for media in [false, true] {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut header = Vec::new();
+                while !header.ends_with(b"\r\n\r\n") {
+                    header.push(socket.read_u8().await.unwrap());
+                }
+                let body = if media {
+                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                    vec![byte; 128 * 1024]
+                } else {
+                    serde_json::to_vec(&serde_json::json!({
+                        "videoId": "abcdefghijk", "title": "Synthetic", "author": "Test",
+                        "lengthSeconds": 10,
+                        "adaptiveFormats": [{
+                            "url": source, "type": "audio/mp4; codecs=mp4a.40.2",
+                            "bitrate": "128000"
+                        }]
+                    }))
+                    .unwrap()
+                };
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                socket.write_all(header.as_bytes()).await.unwrap();
+                // A losing probe may close the connection before consuming the body.
+                let _ = socket.write_all(&body).await;
+            }
+        });
+        (url, task)
+    }
+
+    #[tokio::test]
+    async fn faster_audio_wins_and_probe_bytes_are_delivered_exactly_once() {
+        let (slow, slow_task) = audio_server(300, 1).await;
+        let (fast, fast_task) = audio_server(0, 2).await;
+        let provider = AutomaticProvider::new(None).unwrap();
+        *provider.cache.lock().await = Some((Instant::now(), vec![slow, fast]));
+        let item = Track {
+            provider: ProviderId::Invidious,
+            id: "abcdefghijk".into(),
+            title: "Synthetic".into(),
+            artist: "Test".into(),
+            album: String::new(),
+            duration_secs: 10,
+        };
+        let (tx, mut rx) = mpsc::channel(256);
+        tokio::time::timeout(Duration::from_secs(3), provider.stream(&item, tx))
+            .await
+            .unwrap()
+            .unwrap();
+        let mut bytes = Vec::new();
+        while let Some(chunk) = rx.recv().await {
+            bytes.extend(chunk);
+        }
+        assert_eq!(bytes, vec![2; 128 * 1024]);
+        slow_task.await.unwrap();
+        fast_task.await.unwrap();
     }
 }

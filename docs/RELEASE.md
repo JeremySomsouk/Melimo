@@ -1,3 +1,39 @@
+# v0.2.0 release preparation
+
+Package: **0.2.0**. Source preparation only; no release tag or publication yet.
+
+## Included features
+
+- Anonymous Invidious audio player alongside Deezer, with shared transport and
+  provider-aware queues.
+- Automatic HTTPS instance discovery, ten-minute candidate cache, bounded audio
+  throughput sampling and pre-playback fallback.
+- `melimo --invidious` works without manual instance configuration. Optional
+  settings use `[invidious]`; older provider flags and sections must be migrated.
+
+## Validation
+
+The Invidious feature snapshot passed formatting, strict Clippy, 77 automated
+tests and the release build; 3 manual/device tests were ignored.
+Evidence: https://github.com/JeremySomsouk/Melimo/actions/runs/36164352583
+
+The prepared 0.2.0 version and documentation snapshot still needs its own CI run.
+
+Before publication:
+1. Run formatting, strict Clippy, locked tests and locked release build.
+2. Check `melimo --version` reports 0.2.0.
+3. Verify live discovery, search, audible playback, pause, seek, queue behavior and
+   instance failures from the listener's network.
+4. Repeat the Deezer smoke test with an authorized account.
+5. Review the dependency audit and final release notes, then tag `v0.2.0`.
+
+Public-instance availability and live audio remain unverified. AAC-LC/M4A recorded
+audio is supported; Opus-only streams, live video and video rendering are outside
+this release. Throughput measures sampled delivery, not maximum instance capacity.
+Errors after playback begins require retry; incompatible streams are not spliced.
+
+---
+
 # v0.1.0 release validation
 
 Package: **0.1.0**. Release notes finalized on 2026-09-24.

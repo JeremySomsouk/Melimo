@@ -1,0 +1,5 @@
+# Automatic discovery is enabled without a configuration file.
+[invidious]
+enabled = true
+# Optional explicit override, bypassing discovery:
+# invidious_instance = "https://example.invalid"

@@ -1,6 +1,6 @@
 [package]
 name = "melimo"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "A streaming-only terminal music player"
@@ -14,8 +14,9 @@ unicode-width = "0.2"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = { version = "0.9", default-features = false, features = ["parse", "serde"] }
 thiserror = "2"
-rodio = { version = "0.21.1", default-features = false, features = ["playback", "symphonia-mp3"] }
+rodio = { version = "0.21.1", default-features = false, features = ["playback", "symphonia-mp3", "symphonia-aac", "symphonia-isomp4"] }
 blowfish = "0.9"
 md-5 = "0.10"
 rand = "0.10"

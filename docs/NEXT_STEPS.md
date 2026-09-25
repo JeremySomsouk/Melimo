@@ -1,5 +1,74 @@
 # Mélimo next steps
 
+## v0.2.0 release preparation
+
+- [x] Consolidate the Invidious feature snapshot and prepare package version 0.2.0.
+- [x] Update release notes and configuration migration guidance.
+- [ ] Validate the prepared release snapshot in CI.
+- [ ] Complete live public-instance acceptance before tagging or publishing.
+
+## COMPLETE — Automatic Invidious implementation
+
+- [x] Rename the provider, CLI flag, configuration and UI labels to Invidious.
+- [x] Enable lazy HTTPS registry discovery without manual configuration.
+- [x] Cache candidates for ten minutes; retry searches and discard failures.
+- [x] Compare bounded audio samples from up to three instances concurrently and
+  continue playback from the fastest successful response without redownloading.
+- [x] Preserve explicit instance overrides and report failures in the TUI.
+- [x] Feature implementation passed formatting, strict Clippy, 77 automated tests
+  and the release build in CI (3 manual tests were ignored).
+- [ ] Verify live discovery and playback from the user's network.
+
+No public media instance is hard-coded. Throughput is a short observation, not a
+promise of maximum bandwidth. Mid-stream failures require retry to avoid joining
+incompatible encodings or repeating audio. Focused tests cover registry filtering, lazy empty search, explicit overrides,
+HTTP failover/cache eviction, faster audio selection and exact probe continuation.
+
+## COMPLETE — Invidious audio provider (2026-09-25)
+
+- [x] Introduce and test provider-aware media models and provider routing.
+- [x] Preserve Deezer search, discovery, authentication and playback behavior.
+- [x] Add validated, configurable Invidious settings (automatic discovery now enabled by default).
+- [x] Implement Invidious search and map results into shared media items.
+- [x] Implement video metadata lookup and replaceable audio stream resolution.
+- [x] Connect resolved audio to the existing player and normal mixed queue.
+- [x] Support play/pause, seek, stop and provider identification in the TUI.
+- [x] Handle provider, timeout, rate-limit, restriction and playback errors.
+- [x] Add unit and focused HTTP/playback integration tests; run existing tests.
+- [x] Document configuration, architecture and runtime dependencies.
+
+Initial scope: provider-specific search and audio-only playback. No browser player,
+authentication, video renderer or SponsorBlock integration for Invidious.
+
+Implementation: the existing `Track` model now carries provider identity; routing
+preserves Deezer capabilities and mixed queue snapshots. Invidious search and
+metadata feed a separate stream resolver. Resolution selects audio-only AAC/M4A
+and requests instance-proxied URLs (`local=true`); the existing bounded audio
+pipeline handles playback and transport. No external runtime extractor is needed.
+
+Validation: 73 automated tests pass, including all Deezer regressions, Invidious
+HTTP fixtures, mixed queues, error propagation, nonseekable AAC decoding/seeking
+and TUI provider labels at 40/60/100 columns. Formatting, strict Clippy and release
+build pass. Both generated MP3 and AAC audio-device smoke tests pass. A temporary
+local Invidious fixture exercised the real TUI through anonymous startup, search,
+enqueue, queue playback, pause, seek while paused, resume, next, resize, stop and
+clean exit. No live public instance or Deezer account was used in this milestone's
+validation; live instance availability remains an operational check below.
+
+### Future provider TODO (outside this milestone)
+
+- [ ] Validate a maintainer-chosen live Invidious instance before the next release.
+
+- [ ] Opt-in/configurable SponsorBlock segments (sponsor, intro, outro, self-promotion).
+- [ ] Combined Deezer + Invidious search.
+- [ ] Invidious playlists.
+- [ ] Channel browsing.
+- [ ] Subscriptions.
+- [ ] Local Invidious history/favorites.
+- [ ] Configurable resolver fallback (such as optional external yt-dlp).
+- [ ] Native/external video playback.
+- [ ] Terminal-rendered video.
+
 ## v0.1.0 terminal player complete
 
 - [x] Give the terminal interface a more polished, distinctive Mélimo identity
@@ -58,4 +127,3 @@ Sources checked 2026-09-23:
 - Website: https://github.com/JeremySomsouk/jeremysomsouk.github.io
 - Static hosting: https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages
 - Browser CORS: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
-

@@ -1,50 +1,84 @@
 # Mélimo
 
-A streaming-only music player for your terminal, written in Rust.
-Search, explore playlists, build a queue and follow synchronized lyrics from the keyboard.
+**Your music, in your terminal.**
 
-**Version:** `0.2.0` (release preparation). Linux and macOS are the initial targets.
+Mélimo is a lightweight music player written in Rust. Search with Deezer or
+Invidious, build one queue, and control playback from your keyboard. Follow
+synchronized lyrics when Deezer provides them.
 
-![Mélimo player with synthetic demo metadata and lyrics](docs/assets/player.png)
+**v0.2.0 — release preparation · Linux and macOS · MIT**
 
-## Features
+![Mélimo terminal player with synthetic demo metadata and lyrics](docs/assets/player.png)
 
-- Deezer track and playlist search, personal playlists, favorites and Flow.
-- Invidious audio search with automatic instance discovery and audio throughput selection.
-- MP3 and AAC/M4A playback, pause/resume, volume/mute, mixed queue, shuffle and next track.
-- Progress display and 10-second backward/forward seeking.
-- Line-synchronized lyrics when available, with plain-text fallback and credits.
-- Dark plum, light and monochrome themes; compact player controls.
-- Offline metadata demo, hidden login prompt and optional local session storage.
+## One player, two providers
 
-Mélimo is an **unofficial client**, not affiliated with Deezer or Invidious. Deezer
-requires your own account and access to the tracks you play. Invidious uses anonymous
-Invidious API requests. Provider behavior can change without
-notice; streaming-only does not imply official API support.
+Both providers share the player, queue, pause/resume, volume, mute, shuffle,
+next-track and seek controls. Switch search providers with `P` without
+interrupting the current track or clearing your queue.
+
+| Capability | Deezer | Invidious |
+| --- | --- | --- |
+| Track search and audio playback | Yes | Yes, from recorded videos |
+| Access | Your own Deezer account | Anonymous; no login |
+| Setup | Sign in once or supply an ARL | Automatic instance discovery |
+| Playlists, favorites and Flow | Yes | Not yet |
+| Synchronized lyrics | When available | Not yet |
+| Audio formats | MP3 | AAC-LC/M4A |
+
+Mélimo streams audio in memory; it does not offer audio downloads or export.
+It is an unofficial client, unaffiliated with either provider. Availability
+depends on your account access or the selected public instance.
 
 ## Install
 
-Install current stable Rust. On Debian/Ubuntu, install the audio build dependencies:
+Install current stable Rust and the audio build prerequisites.
+
+**Debian / Ubuntu**
 
 ```sh
 sudo apt-get install libasound2-dev pkg-config
 ```
 
-On macOS, install Xcode Command Line Tools (`xcode-select --install`). Then:
+**macOS**
+
+```sh
+xcode-select --install
+```
+
+Then build from source:
 
 ```sh
 git clone https://github.com/JeremySomsouk/Melimo.git
 cd Melimo
 cargo install --locked --path .
-melimo --mock
 ```
 
-Playback needs an interactive terminal and an audio output device. The mock demo
-uses fictional metadata, makes no network requests and does not play audio.
-Windows is not a validated release target; credential persistence is disabled
-outside Unix until equivalent file-access protections are implemented.
+The commands install the checked-out source version. v0.2.0 is being prepared
+and has not been tagged or published. Playback needs an interactive terminal
+and an audio output device. Windows is not a validated target.
 
-## Sign in
+## Start listening
+
+### Invidious — no account needed
+
+```sh
+melimo --invidious
+```
+
+Press `/`, enter a search, and press `Enter`. Select a result and press
+`Enter` to play it, or `e` to add it to the queue.
+
+Mélimo discovers HTTPS API instances on first use and caches candidates for ten
+minutes. Before playback, it compares small audio samples from up to three
+instances at a time and keeps the fastest successful response. Failed candidates
+are discarded; another batch is tried if none succeeds. The winning sample flows
+straight into playback without downloading it again.
+
+This measures current delivery speed among sampled instances, not their maximum
+bandwidth. Public instances can be unavailable, restricted or rate-limited.
+If playback fails after starting, retry the track or press `n` to skip it.
+
+### Deezer — your library and lyrics
 
 ```sh
 melimo --login
@@ -52,172 +86,124 @@ melimo --login
 
 Sign in on Deezer's own page, then copy the `arl` cookie from browser DevTools
 (Application/Storage → Cookies → `https://www.deezer.com`) into the hidden terminal
-prompt. Mélimo never asks for your Deezer password or reads the browser cookie store.
+prompt. Mélimo never asks for your password or reads the browser cookie store.
 
-**Treat the ARL like a password.** Never paste it into an issue, chat, screenshot,
-command-line argument or committed file. After authentication succeeds, Mélimo can
-save it locally. It is a plaintext credential protected by filesystem permissions,
-not an encrypted keychain entry.
+Treat the ARL like a password: never put it in a command-line argument, issue,
+chat, screenshot or committed file. The optional saved login is plaintext,
+protected by owner-only filesystem permissions; it is not an encrypted keychain.
 
-| Option | Behavior |
-| --- | --- |
-| `melimo` | Use `DEEZER_ARL`, then the saved login |
-| `melimo --login` | Explicit interactive login; save only after successful authentication |
-| `melimo --check-auth` | Check login without the TUI or displaying account details |
-| `melimo --forget` | Remove the saved login |
-| `MELIMO_NO_STORE=1 melimo --login` | Use a login for this process only; do not read/write saved credentials |
+For subsequent launches:
 
-`DEEZER_ARL` is never automatically saved. To supply it in Bash without putting its
-value in shell history:
-
-```bash
-read -rsp 'Deezer ARL: ' DEEZER_ARL
-printf '\n'
-export DEEZER_ARL
+```sh
 melimo
-unset DEEZER_ARL
 ```
 
-A saved login lives in `~/Library/Application Support/melimo/session` on macOS,
-or `$XDG_DATA_HOME/melimo/session` (default `~/.local/share/melimo/session`) on Linux.
-The directory must be owner-only (`0700`) and the regular file owner-only (`0600`).
-Unsafe permissions, symlinks, hard-linked credentials and oversized files are refused.
-A saved login explicitly rejected at startup is removed; transient network failures
-leave it intact. A failed interactive replacement preserves the previous login.
+Deezer starts on Discover. Browse playlists or search with `/`; use `Tab`
+outside text entry to switch between track and playlist search. With Invidious
+enabled, `P` switches between both providers.
 
-## Invidious audio
+| Command | Purpose |
+| --- | --- |
+| `melimo --invidious` | Start Invidious only, without reading Deezer credentials |
+| `melimo` | Start Deezer using `DEEZER_ARL` or the saved login; also enable Invidious |
+| `melimo --login` | Sign in interactively; save only after successful authentication |
+| `melimo --check-auth` | Validate Deezer credentials without opening the player |
+| `melimo --forget` | Remove the saved Deezer login |
+| `MELIMO_NO_STORE=1 melimo --login` | Sign in for this process without saved-login access |
+| `melimo --mock` | Explore the interface with fictional metadata and no audio or network |
+| `melimo --version` | Show the installed version |
 
-Invidious is enabled by default. Run `melimo --invidious` without configuration.
-On first use, Mélimo fetches HTTPS API candidates from the official instance
-registry and caches them for ten minutes. Discovery never blocks Deezer startup.
-Search retries available candidates with a four-second timeout per instance.
-Before playback, up to three instances deliver a small audio sample concurrently;
-the fastest measured delivery is retained and continues directly into playback.
-This measures current delivery to your connection, not a guaranteed maximum
-bandwidth. Probes have a six-second deadline and bounded buffers. Failed instances
-are removed from the cache. A failure after playback starts is reported for retry;
-audio from different instances is never concatenated mid-track.
+`DEEZER_ARL` is never automatically saved. Saved credentials live in
+`~/Library/Application Support/melimo/session` on macOS, or
+`$XDG_DATA_HOME/melimo/session` on Linux (default
+`~/.local/share/melimo/session`). See [security](SECURITY.md) for storage protections.
 
-Optional settings go in `$XDG_CONFIG_HOME/melimo/config.toml` (default
-`~/.config/melimo/config.toml`) or the file named by `MELIMO_CONFIG`:
+## Queue, playback and lyrics
 
-```toml
-[invidious]
-enabled = true
-# Optional override; omit for automatic discovery:
-# invidious_instance = "https://example.invalid"
-```
+Searches and provider switches preserve the current track and queue. Results are
+labelled `[DZR]` or `[INV]`. Press `b` to open the queue; playing a queued track
+skips earlier entries. Playback errors stop automatic progression so you can retry
+or explicitly skip a failed track.
 
-An explicit instance bypasses discovery and comparison probes. HTTP is supported
-for locally hosted instances. Credentials, query strings and fragments are rejected
-in the instance setting; path prefixes are supported. Use `enabled = false` to
-disable the provider. The provider CLI flag and configuration section are now
-`--invidious` and `[invidious]`; update older configurations accordingly.
+Deezer's **Familiar** view loads favorites; **For you** loads a batch of Flow
+recommendations. **Discover** excludes the first 1,000 favorites from that batch.
+Genre and mood shortcuts search playlist keywords.
 
-Run `melimo --invidious` for anonymous Invidious-only playback; this mode does not
-read Deezer credentials or require login. With a Deezer login and Invidious enabled,
-run `melimo` for both providers. Press `P` outside text entry to switch search
-provider, then `/`, a query, and `Enter`. Search results and the queue show `[DZR]`
-or `[INV]`. Select a result and press `Enter` to play; `e` adds it to the queue.
-Provider switches and searches preserve the playing item and queue. `b` opens the
-queue; `Enter` there starts playback from the selected entry. `Space`, arrows,
-`n`, `s`, volume and mute work through the same player for both providers.
-
-This milestone supports recorded videos with an audio-only **AAC-LC/M4A** stream.
-It selects the highest advertised bitrate among supported formats. Opus/WebM-only,
-live and upcoming videos are not supported. Search omits live/upcoming entries;
-metadata lookup rejects videos that become unavailable or unsupported. An expired
-or denied audio URL triggers one fresh metadata lookup before any audio is sent;
-a second failure is shown in the player. Select the result again to retry.
-Seeking resolves a fresh stream and decodes forward from the start, so long seeks
-can buffer and use extra bandwidth. Stop clears the queue, as in Deezer mode.
-
-No Invidious login, cookies, browser player, advertising UI, yt-dlp or ffmpeg is
-needed at runtime. AAC decoding is compiled into the existing Rodio player.
-Metadata requests ask for proxied media URLs with `local=true`. The instance and
-returned media hosts receive network requests; availability,
-rate limits and regional access depend on that infrastructure. Errors never echo
-raw responses or signed audio URLs. No audio is saved to disk.
-
-Deezer discovery, playlists, favorites and lyrics remain Deezer capabilities.
-Invidious starts on search; `d` returns to search, and `q`/`Esc` from that screen exits.
-`Tab` explains that Invidious playlists are not yet available. Combined search,
-playlists, resolver fallback, opt-in SponsorBlock and video remain future work in
-[next steps](docs/NEXT_STEPS.md).
-
-## Find and play music
-
-Deezer starts on **Discover**. Choose a genre or mood to search playlists, inspect one with
-`Enter`, then play a track or press `a` for the displayed set. `d` returns to browsing
-while playback continues. `/` edits search; `Tab` changes track/playlist search when
-not typing.
-
-**Familiar** loads favorites. **For you** loads a batch of Flow recommendations.
-**Discover** excludes the first 1,000 favorites from Flow; it does not guarantee
-never-heard songs. Genre/mood shortcuts are playlist keyword searches, not
-personalized genre filters.
-
-`p` opens the player; `l` toggles lyrics. Seeking restarts the stream and decodes
-forward in bounded memory, so it can buffer and uses extra network traffic.
-The queue and pause state are preserved. Lyrics highlight whole lines, not individual
-words, and do not remove vocals. Missing lyrics never prevent playback.
-
-## Controls
+Press `p` to open the player and `l` to show lyrics. Synchronized lyrics highlight
+whole lines, with plain-text fallback when available. Missing lyrics do not block
+playback. This is a lyrics view, not vocal removal.
 
 | Key | Action |
 | --- | --- |
 | `j/k`, `↑/↓`, `g/G` | Select / first / last |
-| `Enter` | Browse, inspect playlist or play selected track |
-| `a`, `r` | Play all / shuffle and play |
-| `p`, `b` | Player / upcoming queue |
-| `e`, `Delete` | Enqueue selected track / remove queued track |
+| `Enter` | Open a playlist or play the selected track |
+| `/`, `Tab`, `P` | Edit search / change Deezer search type / switch provider |
+| `a`, `r` | Play all / shuffle and play the displayed set |
+| `e`, `Delete` | Enqueue a track / remove a queued track |
+| `p`, `b`, `d` | Player / queue / browse or search |
 | `Space`, `n`, `s` | Pause/resume / next / stop and clear queue |
 | `+/-`, `m` | Volume in 5% steps / mute |
 | `←/→` in player | Seek backward/forward 10 seconds |
-| `l` | Lyrics/karaoke |
-| `f` | Add/remove selected or current song from **your Deezer favorites** |
-| `L` | Refresh login; stops playback and clears the queue |
-| `d`, `/`, `Tab` | Discover (Invidious: search) / edit search / change Deezer search type |
-| `P` | Switch search provider outside text entry |
-| `Backspace`, `Ctrl+U` | Delete character / clear search |
-| `?` | Help |
-| `q`, `Esc` | Back; quit from Discover or Invidious search |
+| `l`, `f` | Toggle lyrics / toggle Deezer favorite |
+| `L` | Refresh Deezer login; stops playback and clears the queue |
+| `Backspace`, `Ctrl+U` | Delete a search character / clear search |
+| `?` | Show help |
+| `q`, `Esc` | Back; quit from the initial browse/search screen |
 | `Ctrl+C` | Quit |
 
-New searches preserve the queue. Enter on a queued song skips earlier entries.
-Playback errors halt automatic progression; `n` explicitly skips the failed song.
+Provider and navigation shortcuts apply outside text entry.
 
-## Appearance
+## Configuration
 
-```sh
-MELIMO_THEME=dark melimo    # default
-MELIMO_THEME=light melimo
-MELIMO_THEME=mono melimo    # inherit terminal colors
+Invidious works without a configuration file. To disable it or choose a specific
+instance, use `$XDG_CONFIG_HOME/melimo/config.toml` (default
+`~/.config/melimo/config.toml`, including macOS), or set `MELIMO_CONFIG` to a file.
+
+```toml
+[invidious]
+enabled = true
+# Optional override; omit to discover instances automatically:
+# invidious_instance = "https://example.invalid"
 ```
 
-A nonempty `NO_COLOR` takes precedence. Themes are read once at startup. A width
-of 40 columns is the compact minimum for usable player controls; larger windows
-show more metadata and lyrics. Terminals smaller than that remain safe to resize.
+An explicit instance bypasses discovery and speed comparison. Use HTTPS for
+remote instances; HTTP supports locally hosted instances. URLs with credentials,
+query strings or fragments are rejected. Set `enabled = false` to disable the
+provider. See [the example configuration](config.example.toml).
 
-## Privacy and limitations
+For earlier development configurations, migrate to the `--invidious` flag and
+the `[invidious]` section.
 
-- No audio download/export, telemetry or listening-history log. Audio and lyrics
-  stay in memory; OS swap/core dumps are outside that guarantee.
-- The only intentional user-data write is the optional saved login and its temporary
-  file during atomic replacement. Storage permissions do not protect against other
-  processes running as you, administrators, backups or compromised machines.
-- ARL cookies go only to the fixed HTTPS Deezer gateway. Media authorization uses
-  a fixed HTTPS endpoint; audio URLs are restricted to Deezer/CDN hosts. Redirects
-  are disabled and errors omit raw provider responses and credential-bearing URLs.
-- Deezer search returns up to 50 results. Playlist/favorite sets cap at 1,000 tracks.
-  Flow is a finite batch, not an endlessly replenished radio. Invidious uses the
-  first Invidious search page, bounded by a 2 MiB API response limit.
-- No previous-track control, persistent queue, alternate quality or browser player.
-- Now-playing metadata appears in the terminal title, so it can be visible in
-  desktop screenshots or terminal integrations.
+Choose a theme at startup:
 
-See [security](SECURITY.md), [release validation](docs/RELEASE.md) and
-[protocol references](docs/REFERENCES.md).
+```sh
+MELIMO_THEME=dark melimo --invidious   # default
+MELIMO_THEME=light melimo --invidious
+MELIMO_THEME=mono melimo --invidious  # inherit terminal colors
+```
+
+A nonempty `NO_COLOR` takes precedence. The compact player supports terminals
+from 40 columns wide; larger windows show more metadata and lyrics.
+
+## Current limits
+
+- Invidious plays recorded audio with an AAC-LC/M4A stream. Opus/WebM-only media,
+  live streams and video playback are not supported. No external extractor or
+  FFmpeg installation is needed at runtime.
+- Seeking restarts the stream and decodes forward in bounded memory, which can
+  buffer and use additional bandwidth.
+- Instance selection happens before playback. Mid-stream failures require retry;
+  Mélimo does not join audio from different instances.
+- Deezer search returns up to 50 results; playlists and favorites cap at 1,000
+  tracks. Flow is a finite batch. Invidious uses the first search results page.
+- There is no persistent queue, previous-track control or combined-provider search.
+- Audio and lyrics stay in memory; OS swap and core dumps are outside that
+  guarantee. The selected instance and media hosts receive network requests.
+- Now-playing metadata appears in the terminal title and may appear in screenshots.
+
+Automated tests cover both providers, discovery and playback using synthetic data.
+Live public-instance playback for v0.2 remains an acceptance check before release.
+See [release validation](docs/RELEASE.md) and [planned work](docs/NEXT_STEPS.md).
 
 ## Development
 
@@ -228,36 +214,26 @@ cargo test --locked
 cargo build --locked --release
 ```
 
-Tests use synthetic HTTP responses, invented lyrics and a generated tone; they do
-not need a Deezer account or a live Invidious instance. CLI tests disable saved-login access. Optional checks:
+Tests use synthetic HTTP responses, invented lyrics and generated audio; they
+require no account or live public instance. Optional manual checks:
 
 ```sh
 cargo test --locked --release synthetic_render_review -- --ignored --nocapture
 cargo test --locked audio_device -- --ignored --test-threads=1
 ```
 
-The first measures rendering with synthetic metadata and a 1,000-track queue.
-The second plays short generated MP3 and AAC tones through the default output device.
-Neither proves live Deezer playback or lyric timing; the release checklist covers that.
+The rendering check exercises synthetic UI data. The device check plays generated
+MP3 and AAC tones. Neither replaces live provider acceptance.
 
-The TUI and state live in `src/tui` and `src/app`; provider operations are cancellable
-Tokio tasks. Separate network, decoder and audio workers communicate through bounded
-encoded-audio/PCM channels. Display updates follow elapsed seconds and lyric-line changes;
-audio never waits for a terminal redraw.
+The TUI and state live in `src/tui` and `src/app`. Provider identity travels with
+tracks through search, queue and playback. Network, decoder and audio workers use
+bounded channels; terminal redraws do not block audio. Invidious discovery and
+stream resolution remain separate from the shared player.
 
-`Track` carries explicit `ProviderId` identity; it is shared by search, playback
-and queue snapshots. `Providers` routes operations by that identity, with
-`MusicProvider` retaining provider-specific discovery capabilities. Invidious
-metadata and the `StreamResolver` boundary are separate from byte transport;
-resolved URLs are ephemeral and never stored in queued items. This allows a
-future optional resolver fallback without changing the player. The common
-playback clock and seek actions are the future integration point for optional
-segment skipping; no speculative segment service is included now.
-
-Next: provider follow-ups and investigation of a shared Rust core/web prototype. See [next steps](docs/NEXT_STEPS.md).
-Contributions should stay focused and never include account responses, cookies or
-personal test fixtures.
+Contributions should stay focused and exclude credentials, account responses and
+personal fixtures. See [security](SECURITY.md) and
+[protocol references](docs/REFERENCES.md).
 
 ## License
 
-[MIT](LICENSE). See the protocol reference notes for third-party attribution.
+[MIT](LICENSE).

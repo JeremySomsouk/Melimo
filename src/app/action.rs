@@ -30,6 +30,7 @@ pub enum Action {
     FavoriteFinished(Result<bool, String>),
     Login,
     ToggleSearchKind,
+    CycleProvider,
     PlayAll,
     NextTrack,
     BrowseFinished {

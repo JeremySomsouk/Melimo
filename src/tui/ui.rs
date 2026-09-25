@@ -33,7 +33,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
         header,
     );
     if app.show_help {
-        frame.render_widget(Paragraph::new("/  Edit search · Enter submits\nBackspace  Delete last character · Ctrl+U  Clear query\nj/k or ↑/↓  Select · g/G  First/last\nEnter  Play selected track\nSpace  Pause/resume · ←/→  Seek 10s · +/-  Volume · m  Mute · l  Lyrics/karaoke · s  Stop\nd  Discover genres, moods, Flow & favorites\nTab  Switch track / playlist search\na  Play all displayed tracks · n  Next queued track\np  Return to player · b  Queue · r  Shuffle and play\ne  Enqueue selected track · Delete  Remove queued track\nf  Toggle selected/current Deezer favorite · L  Refresh login\nq / Esc  Back, or quit from Discover\nCtrl+C  Always quit\n?  Toggle help").block(theme::panel().title("Help")).wrap(Wrap { trim: true }), body);
+        frame.render_widget(Paragraph::new("/  Edit search · Enter submits\nBackspace  Delete last character · Ctrl+U  Clear query\nj/k or ↑/↓  Select · g/G  First/last\nEnter  Play selected track\nSpace  Pause/resume · ←/→  Seek 10s · +/-  Volume · m  Mute · l  Lyrics/karaoke · s  Stop\nd  Discover genres, moods, Flow & favorites\nP  Switch search provider · Tab  Tracks / playlists (Deezer)\na  Play all displayed tracks · n  Next queued track\np  Return to player · b  Queue · r  Shuffle and play\ne  Enqueue selected track · Delete  Remove queued track\nf  Toggle selected/current Deezer favorite · L  Refresh login\nq / Esc  Back, or quit from Discover\nCtrl+C  Always quit\n?  Toggle help").block(theme::panel().title("Help")).wrap(Wrap { trim: true }), body);
     } else if app.view == View::Discover {
         let rows = DISCOVER.iter().map(|(title, _)| Row::new([*title]));
         table.select(app.selected);
@@ -59,7 +59,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             Table::new(
                 app.queue.iter().map(|t| {
                     Row::new([
-                        t.title.clone(),
+                        format!("[{}] {}", t.provider.label(), t.title),
                         t.artist.clone(),
                         format_time(t.duration_secs),
                     ])
@@ -90,9 +90,15 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             .areas(inner);
             frame.render_widget(
                 Paragraph::new(vec![
-                    Line::styled(track.title.clone(), theme::title()),
+                    Line::styled(
+                        format!("[{}] {}", track.provider.label(), track.title),
+                        theme::title(),
+                    ),
                     Line::styled(track.artist.clone(), theme::base()),
-                    Line::styled(track.album.clone(), theme::muted()),
+                    Line::styled(
+                        format!("{} · {}", track.provider.name(), track.album),
+                        theme::muted(),
+                    ),
                     Line::styled(
                         playback_label(app),
                         if matches!(app.playback, PlaybackState::Error(_)) {
@@ -208,7 +214,8 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             Paragraph::new(input)
                 .scroll((0, scroll))
                 .block(theme::panel().title(format!(
-                    "Search {} · {} · Tab switches",
+                    "Search [{}] {} · {} · P provider",
+                    app.search_provider.label(),
                     if app.playlist_search {
                         "playlists"
                     } else {
@@ -224,7 +231,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             Some(error.as_str())
         } else if !app.searched {
             Some(
-                "Press /, type keywords, then Enter. Tab switches tracks/playlists; d opens Discover.",
+                "Press /, type keywords, then Enter. P switches provider; Tab tracks/playlists; d Discover.",
             )
         } else if (app.showing_playlists && app.playlists.is_empty())
             || (!app.showing_playlists && app.tracks.is_empty())
@@ -279,7 +286,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
         } else {
             let rows = app.tracks.iter().map(|track| {
                 Row::new(vec![
-                    track.title.clone(),
+                    format!("[{}] {}", track.provider.label(), track.title),
                     track.artist.clone(),
                     format_time(track.duration_secs),
                 ])
@@ -309,7 +316,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
     } else if app.view == View::Queue {
         "Enter play from here · r shuffle/play · n next · f favorite · p player · q back"
     } else if app.view == View::Discover {
-        "Enter browse · / search · Tab tracks/playlists · p player · L login · ? help"
+        "Enter browse · / search · P provider · p player · L login · ? help"
     } else if app.showing_playlists {
         "Enter inspect · a play playlist · r shuffle/play · / search · p player · b queue"
     } else {
@@ -374,6 +381,50 @@ mod tests {
     use super::*;
     use ratatui::{Terminal, backend::TestBackend};
     #[test]
+    fn provider_labels_follow_results_queue_and_player() {
+        use crate::provider::{ProviderId, Track};
+        let track = Track {
+            provider: ProviderId::Invidious,
+            id: "abcdefghijk".into(),
+            title: "Synthetic video".into(),
+            artist: "Channel".into(),
+            album: String::new(),
+            duration_secs: 120,
+        };
+        let mut app = App::default();
+        app.search_provider = ProviderId::Invidious;
+        app.tracks = vec![track.clone()];
+        app.queue = vec![track.clone()].into();
+        app.opened = Some(track);
+        app.selected = Some(0);
+        app.searched = true;
+        for width in [40, 60, 100] {
+            for view in [View::Search, View::Queue, View::NowPlaying] {
+                app.view = view;
+                let mut terminal = Terminal::new(TestBackend::new(width, 24)).unwrap();
+                terminal
+                    .draw(|f| {
+                        render(
+                            f,
+                            &app,
+                            app.search_provider.name(),
+                            &mut TableState::default(),
+                        )
+                    })
+                    .unwrap();
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|c| c.symbol())
+                    .collect();
+                assert!(text.contains("[INV]"));
+                assert!(text.contains("Channel"));
+            }
+        }
+    }
+    #[test]
     fn renders_small_and_normal_terminals() {
         for (width, height) in [(1, 1), (20, 5), (80, 24)] {
             let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
@@ -393,6 +444,7 @@ mod tests {
         let mut app = App::default();
         app.update(crate::app::action::Action::ToggleLyrics);
         app.opened = Some(Track {
+            provider: crate::provider::ProviderId::Mock,
             id: "demo".into(),
             title: "Demo".into(),
             artist: "Demo".into(),

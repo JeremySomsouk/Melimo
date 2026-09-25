@@ -1,4 +1,5 @@
 pub mod store;
+pub mod youtube;
 
 use std::{env, fmt};
 

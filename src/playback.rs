@@ -1,8 +1,8 @@
-//! Bounded in-memory pipeline: HTTP -> MP3 decoder -> PCM -> audio device.
+//! Bounded in-memory pipeline: HTTP -> audio decoder -> PCM -> audio device.
 //! The device callback never waits on network I/O.
 use crate::{
     app::{action::Action, state::PlaybackState},
-    provider::MusicProvider,
+    provider::{Track, router::Providers},
 };
 use rodio::{Decoder, OutputStreamBuilder, Sink, Source};
 use std::{
@@ -39,8 +39,8 @@ impl Playback {
             .store(level.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
     }
     pub fn start(
-        provider: Arc<impl MusicProvider>,
-        track: String,
+        provider: Arc<Providers>,
+        track: Track,
         id: u64,
         tx: mpsc::Sender<Action>,
         offset: u64,
@@ -50,10 +50,14 @@ impl Playback {
         let cancelled = Arc::new(AtomicBool::new(false));
         let paused = Arc::new(AtomicBool::new(initially_paused));
         let volume = Arc::new(AtomicU32::new(volume.clamp(0.0, 1.0).to_bits()));
-        let (audio_tx, audio_rx) = mpsc::channel(32); // 64 KiB of decrypted MP3.
+        let (audio_tx, audio_rx) = mpsc::channel(32); // Bounded chunks of encoded audio.
         let notify = tx.clone();
+        let network_cancel = cancelled.clone();
         let network = tokio::spawn(async move {
-            if let Err(error) = provider.stream_track(track, audio_tx.clone()).await {
+            if let Err(error) = provider.stream(track, audio_tx.clone()).await {
+                // Preserve the useful provider failure; a closed byte channel must
+                // not race it with a generic decoder error or queue advancement.
+                network_cancel.store(true, Ordering::Relaxed);
                 let _ = notify
                     .send(Action::PlaybackUpdate {
                         id,
@@ -215,7 +219,6 @@ fn play(
     };
     let mut decoder = Decoder::builder()
         .with_data(reader)
-        .with_hint("mp3")
         .with_seekable(false)
         .build()
         .map_err(|_| "Cannot decode this audio stream. Try another track.")?;
@@ -331,6 +334,65 @@ fn play(
 mod tests {
     use super::*;
     #[test]
+    fn decodes_and_seeks_aac_m4a_from_nonseekable_chunks() {
+        let bytes = include_bytes!("../tests/fixtures/tone.m4a");
+        let (tx, rx) = mpsc::channel(2);
+        let feed = thread::spawn(move || {
+            for chunk in bytes.chunks(127) {
+                if tx.blocking_send(chunk.to_vec()).is_err() {
+                    break;
+                }
+            }
+        });
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut decoder = Decoder::builder()
+            .with_data(AudioReader {
+                rx,
+                current: io::Cursor::new(Vec::new()),
+                cancelled: cancel.clone(),
+            })
+            .with_seekable(false)
+            .build()
+            .unwrap();
+        assert_eq!(decoder.channels(), 2);
+        assert_eq!(decoder.sample_rate(), 44100);
+        assert!(discard_samples(&mut decoder, 8820, &cancel));
+        let remainder: Vec<_> = decoder.collect();
+        assert!(remainder.len() >= 13230);
+        assert!(remainder.iter().any(|s| s.abs() > 0.01));
+        feed.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn provider_failure_reaches_ui_without_decoder_error_race() {
+        let providers = Arc::new(Providers::default());
+        let (tx, mut rx) = mpsc::channel(8);
+        let player = Playback::start(
+            providers,
+            Track {
+                provider: crate::provider::ProviderId::YouTube,
+                id: "abcdefghijk".into(),
+                title: "Synthetic".into(),
+                artist: "Channel".into(),
+                album: String::new(),
+                duration_secs: 120,
+            },
+            7,
+            tx,
+            0,
+            false,
+            1.0,
+        );
+        let action = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            matches!(action, Action::PlaybackUpdate { id: 7, state: PlaybackState::Error(e), .. } if e.contains("YouTube is disabled"))
+        );
+        drop(player);
+    }
+    #[test]
     #[ignore = "requires an audio device; plays a generated quarter-second tone"]
     fn audio_device_smoke() {
         let (tx, rx) = mpsc::channel(32);
@@ -393,7 +455,6 @@ mod tests {
         };
         let decoder = Decoder::builder()
             .with_data(reader)
-            .with_hint("mp3")
             .with_seekable(false)
             .build()
             .unwrap();
@@ -405,7 +466,6 @@ mod tests {
         feed.join().unwrap();
         let mut seek_decoder = Decoder::builder()
             .with_data(io::Cursor::new(bytes.to_vec()))
-            .with_hint("mp3")
             .with_seekable(false)
             .build()
             .unwrap();

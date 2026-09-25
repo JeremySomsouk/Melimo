@@ -1,5 +1,7 @@
 pub mod deezer;
+pub mod invidious;
 pub mod mock;
+pub mod router;
 
 use std::future::Future;
 
@@ -118,9 +120,22 @@ pub trait MusicProvider: Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), String>> + Send {
         async { Err("Mock tracks are metadata only. Use Deezer mode for audio playback.".into()) }
     }
-    fn name(&self) -> &'static str;
     fn search_tracks(
         &self,
         query: String,
     ) -> impl Future<Output = Result<Vec<Track>, String>> + Send;
+}
+
+/// A resolved source is ephemeral and never stored in the queue or logged.
+pub struct AudioStream {
+    pub url: reqwest::Url,
+}
+
+/// Resolution is separate from search and byte transport so another resolver can
+/// be introduced later without changing the queue or player.
+pub trait StreamResolver: Send + Sync {
+    fn resolve_audio(
+        &self,
+        item: &Track,
+    ) -> impl Future<Output = Result<AudioStream, String>> + Send;
 }

@@ -2,21 +2,22 @@
 
 ## IN PROGRESS — YouTube / Invidious audio provider
 
-- [ ] Introduce and test provider-aware media models and provider routing.
-- [ ] Preserve Deezer search, discovery, authentication and playback behavior.
-- [ ] Add validated, configurable Invidious settings (disabled by default).
-- [ ] Implement Invidious search and map results into shared media items.
-- [ ] Implement video metadata lookup and replaceable audio stream resolution.
-- [ ] Connect resolved audio to the existing player and normal mixed queue.
-- [ ] Support play/pause, seek, stop and provider identification in the TUI.
-- [ ] Handle provider, timeout, rate-limit, restriction and playback errors.
-- [ ] Add unit and focused HTTP/playback integration tests; run existing tests.
+- [x] Introduce and test provider-aware media models and provider routing.
+- [x] Preserve Deezer search, discovery, authentication and playback behavior.
+- [x] Add validated, configurable Invidious settings (disabled by default).
+- [x] Implement Invidious search and map results into shared media items.
+- [x] Implement video metadata lookup and replaceable audio stream resolution.
+- [x] Connect resolved audio to the existing player and normal mixed queue.
+- [x] Support play/pause, seek, stop and provider identification in the TUI.
+- [x] Handle provider, timeout, rate-limit, restriction and playback errors.
+- [x] Add unit and focused HTTP/playback integration tests; run existing tests.
 - [ ] Document configuration, architecture and runtime dependencies.
 
 Initial scope: provider-specific search and audio-only playback. No browser player,
 authentication, video renderer or SponsorBlock integration for YouTube.
 
-Checkpoint: tracks now carry explicit provider identity; queue snapshots and TUI
+Checkpoint: Invidious configuration, search, resolution and playback are wired;
+72 automated tests pass (including existing Deezer tests). Tracks carry provider identity; queue snapshots and TUI
 labels preserve it. All existing tests plus mixed-provider queue/transport tests
 pass. Keep the existing `Track` model (including Deezer album display); add only
 the identity needed for routing. Resolution will select audio-only AAC/M4A and

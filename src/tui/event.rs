@@ -59,6 +59,7 @@ fn map_key(key: KeyEvent, app: &App) -> Option<Action> {
         KeyCode::Delete if app.view == View::Queue => Some(Action::RemoveQueued),
         KeyCode::Char('l') => Some(Action::ToggleLyrics),
         KeyCode::Char('p') => Some(Action::ShowPlayer),
+        KeyCode::Char('P') => Some(Action::CycleProvider),
         KeyCode::Char('b') => Some(Action::ShowQueue),
         KeyCode::Char('r') => Some(Action::ShufflePlay),
         KeyCode::Char('f') => Some(Action::ToggleFavorite),

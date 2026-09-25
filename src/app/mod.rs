@@ -2,7 +2,7 @@ pub mod action;
 pub mod state;
 
 use crate::{
-    provider::{BrowseKind, MusicProvider},
+    provider::{BrowseKind, router::Providers},
     tui,
 };
 use action::Action;
@@ -16,7 +16,7 @@ fn apply(
     app: &mut App,
     action: Action,
     playback: &mut Option<crate::playback::Playback>,
-    provider: &Arc<impl MusicProvider>,
+    provider: &Arc<Providers>,
     tx: &mpsc::Sender<Action>,
 ) -> Option<SearchRequest> {
     let old_id = app.playback_id;
@@ -40,7 +40,7 @@ fn apply(
         {
             *playback = Some(crate::playback::Playback::start(
                 Arc::clone(provider),
-                track.id.clone(),
+                track.clone(),
                 app.playback_id,
                 tx.clone(),
                 app.elapsed,
@@ -57,12 +57,11 @@ fn apply(
     request
 }
 
-pub fn run(
-    terminal: &mut ratatui::DefaultTerminal,
-    provider: impl MusicProvider,
-) -> io::Result<()> {
+pub fn run(terminal: &mut ratatui::DefaultTerminal, provider: Providers) -> io::Result<()> {
     let provider = Arc::new(provider);
     let mut app = App::default();
+    app.providers = provider.available();
+    app.search_provider = app.providers.first().copied().unwrap_or_default();
     app.update(Action::Discover);
     let mut table = TableState::default();
     let (tx, mut rx) = mpsc::channel(8);
@@ -93,7 +92,7 @@ pub fn run(
                 && lyrics_id.is_none()
                 && let Some(track) = &app.opened
             {
-                let track_id = track.id.clone();
+                let track_id = track.clone();
                 let id = app.playback_id;
                 lyrics_id = Some(id);
                 let provider = Arc::clone(&provider);
@@ -104,7 +103,9 @@ pub fn run(
                 }));
             }
             if dirty {
-                terminal.draw(|frame| tui::ui::render(frame, &app, provider.name(), &mut table))?;
+                terminal.draw(|frame| {
+                    tui::ui::render(frame, &app, app.search_provider.name(), &mut table)
+                })?;
                 dirty = false;
                 let title = terminal_title(&app);
                 if last_title.as_deref() != Some(title.as_str()) {
@@ -115,8 +116,10 @@ pub fn run(
             if let Some(action) = tui::event::read_action(&app)? {
                 dirty = true;
                 if matches!(action, Action::Login) {
-                    if provider.name().starts_with("Mock") {
-                        app.notice = Some("Run melimo --login to leave offline mock mode.".into());
+                    if provider.deezer.is_none() {
+                        app.notice = Some(
+                            "Run melimo --login to enable Deezer login in this session.".into(),
+                        );
                         continue;
                     }
                     apply(
@@ -161,10 +164,10 @@ pub fn run(
                             _ => None,
                         };
                         if let Some(track) = track {
-                            let id = track.id.clone();
+                            let id = track.clone();
                             let provider = Arc::clone(&provider);
                             let tx = tx.clone();
-                            app.notice = Some("Updating Deezer favorite…".into());
+                            app.notice = Some("Updating favorite…".into());
                             favorite_job = Some(tokio::spawn(async move {
                                 let result = provider.toggle_favorite(id).await;
                                 let _ = tx.send(Action::FavoriteFinished(result)).await;
@@ -183,12 +186,14 @@ pub fn run(
                         let action = if matches!(request.kind, BrowseKind::Tracks) {
                             Action::SearchFinished {
                                 id: request.id,
-                                result: provider.search_tracks(request.query).await,
+                                result: provider.search(request.provider, request.query).await,
                             }
                         } else {
                             Action::BrowseFinished {
                                 id: request.id,
-                                result: provider.browse(request.kind, request.query).await,
+                                result: provider
+                                    .browse(request.provider, request.kind, request.query)
+                                    .await,
                             }
                         };
                         let _ = tx.send(action).await;

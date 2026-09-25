@@ -33,7 +33,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
         header,
     );
     if app.show_help {
-        frame.render_widget(Paragraph::new("/  Edit search · Enter submits\nBackspace  Delete last character · Ctrl+U  Clear query\nj/k or ↑/↓  Select · g/G  First/last\nEnter  Play selected track\nSpace  Pause/resume · ←/→  Seek 10s · +/-  Volume · m  Mute · l  Lyrics/karaoke · s  Stop\nd  Discover genres, moods, Flow & favorites\nTab  Switch track / playlist search\na  Play all displayed tracks · n  Next queued track\np  Return to player · b  Queue · r  Shuffle and play\ne  Enqueue selected track · Delete  Remove queued track\nf  Toggle selected/current Deezer favorite · L  Refresh login\nq / Esc  Back, or quit from Discover\nCtrl+C  Always quit\n?  Toggle help").block(theme::panel().title("Help")).wrap(Wrap { trim: true }), body);
+        frame.render_widget(Paragraph::new("/  Edit search · Enter submits\nBackspace  Delete last character · Ctrl+U  Clear query\nj/k or ↑/↓  Select · g/G  First/last\nEnter  Play selected track\nSpace  Pause/resume · ←/→  Seek 10s · +/-  Volume · m  Mute · l  Lyrics/karaoke · s  Stop\nd  Discover genres, moods, Flow & favorites\nP  Switch search provider · Tab  Tracks / playlists (Deezer)\na  Play all displayed tracks · n  Next queued track\np  Return to player · b  Queue · r  Shuffle and play\ne  Enqueue selected track · Delete  Remove queued track\nf  Toggle selected/current Deezer favorite · L  Refresh login\nq / Esc  Back, or quit from Discover\nCtrl+C  Always quit\n?  Toggle help").block(theme::panel().title("Help")).wrap(Wrap { trim: true }), body);
     } else if app.view == View::Discover {
         let rows = DISCOVER.iter().map(|(title, _)| Row::new([*title]));
         table.select(app.selected);
@@ -214,7 +214,8 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             Paragraph::new(input)
                 .scroll((0, scroll))
                 .block(theme::panel().title(format!(
-                    "Search {} · {} · Tab switches",
+                    "Search [{}] {} · {} · P provider",
+                    app.search_provider.label(),
                     if app.playlist_search {
                         "playlists"
                     } else {
@@ -230,7 +231,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             Some(error.as_str())
         } else if !app.searched {
             Some(
-                "Press /, type keywords, then Enter. Tab switches tracks/playlists; d opens Discover.",
+                "Press /, type keywords, then Enter. P switches provider; Tab tracks/playlists; d Discover.",
             )
         } else if (app.showing_playlists && app.playlists.is_empty())
             || (!app.showing_playlists && app.tracks.is_empty())
@@ -315,7 +316,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
     } else if app.view == View::Queue {
         "Enter play from here · r shuffle/play · n next · f favorite · p player · q back"
     } else if app.view == View::Discover {
-        "Enter browse · / search · Tab tracks/playlists · p player · L login · ? help"
+        "Enter browse · / search · P provider · p player · L login · ? help"
     } else if app.showing_playlists {
         "Enter inspect · a play playlist · r shuffle/play · / search · p player · b queue"
     } else {

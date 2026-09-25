@@ -1,17 +1,22 @@
 # Mélimo next steps
 
-## IN PROGRESS — Automatic Invidious discovery
+## IN PROGRESS — Automatic Invidious selection
 
-- [ ] Make YouTube available without a hand-configured instance.
-- [ ] Discover HTTPS API instances from the official public registry on first use.
-- [ ] Validate candidates with bounded timeouts and retain a working choice in memory.
-- [ ] Preserve explicit instance overrides and report discovery failures in the TUI.
-- [ ] Add registry/failover tests, verify live discovery, rebuild and install locally.
+- [x] Rename the provider, CLI flag, configuration and UI labels to Invidious.
+- [x] Enable lazy HTTPS registry discovery without manual configuration.
+- [x] Cache candidates for ten minutes; retry searches and discard failures.
+- [x] Compare bounded audio samples from up to three instances concurrently and
+  continue playback from the fastest successful response without redownloading.
+- [x] Preserve explicit instance overrides and report failures in the TUI.
+- [ ] Pass formatting, Clippy, automated tests and release build in CI.
+- [ ] Verify live discovery and playback from the user's network.
 
-Discovery is lazy so an unavailable registry never blocks Deezer startup. No
-public media instance is hard-coded; explicit settings continue to take precedence.
+No public media instance is hard-coded. Throughput is a short observation, not a
+promise of maximum bandwidth. Mid-stream failures require retry to avoid joining
+incompatible encodings or repeating audio. Focused tests cover registry filtering, lazy empty search, explicit overrides,
+HTTP failover/cache eviction, faster audio selection and exact probe continuation.
 
-## COMPLETE — YouTube / Invidious audio provider (2026-09-25)
+## COMPLETE — Invidious audio provider (2026-09-25)
 
 - [x] Introduce and test provider-aware media models and provider routing.
 - [x] Preserve Deezer search, discovery, authentication and playback behavior.
@@ -25,7 +30,7 @@ public media instance is hard-coded; explicit settings continue to take preceden
 - [x] Document configuration, architecture and runtime dependencies.
 
 Initial scope: provider-specific search and audio-only playback. No browser player,
-authentication, video renderer or SponsorBlock integration for YouTube.
+authentication, video renderer or SponsorBlock integration for Invidious.
 
 Implementation: the existing `Track` model now carries provider identity; routing
 preserves Deezer capabilities and mixed queue snapshots. Invidious search and
@@ -47,11 +52,11 @@ validation; live instance availability remains an operational check below.
 - [ ] Validate a maintainer-chosen live Invidious instance before the next release.
 
 - [ ] Opt-in/configurable SponsorBlock segments (sponsor, intro, outro, self-promotion).
-- [ ] Combined Deezer + YouTube search.
-- [ ] YouTube playlists.
+- [ ] Combined Deezer + Invidious search.
+- [ ] Invidious playlists.
 - [ ] Channel browsing.
 - [ ] Subscriptions.
-- [ ] Local YouTube history/favorites.
+- [ ] Local Invidious history/favorites.
 - [ ] Configurable resolver fallback (such as optional external yt-dlp).
 - [ ] Native/external video playback.
 - [ ] Terminal-rendered video.

@@ -10,15 +10,15 @@ Search, explore playlists, build a queue and follow synchronized lyrics from the
 ## Features
 
 - Deezer track and playlist search, personal playlists, favorites and Flow.
-- YouTube audio search through a configurable Invidious-compatible instance.
+- Invidious audio search with automatic instance discovery and audio throughput selection.
 - MP3 and AAC/M4A playback, pause/resume, volume/mute, mixed queue, shuffle and next track.
 - Progress display and 10-second backward/forward seeking.
 - Line-synchronized lyrics when available, with plain-text fallback and credits.
 - Dark plum, light and monochrome themes; compact player controls.
 - Offline metadata demo, hidden login prompt and optional local session storage.
 
-Mélimo is an **unofficial client**, not affiliated with Deezer or YouTube. Deezer
-requires your own account and access to the tracks you play. YouTube uses anonymous
+Mélimo is an **unofficial client**, not affiliated with Deezer or Invidious. Deezer
+requires your own account and access to the tracks you play. Invidious uses anonymous
 Invidious API requests. Provider behavior can change without
 notice; streaming-only does not imply official API support.
 
@@ -85,30 +85,40 @@ Unsafe permissions, symlinks, hard-linked credentials and oversized files are re
 A saved login explicitly rejected at startup is removed; transient network failures
 leave it intact. A failed interactive replacement preserves the previous login.
 
-## YouTube / Invidious audio
+## Invidious audio
 
-Create a TOML file at `$XDG_CONFIG_HOME/melimo/config.toml` (default
-`~/.config/melimo/config.toml`, including on macOS), or set `MELIMO_CONFIG` to
-another settings file. See [config.example.toml](config.example.toml):
+Invidious is enabled by default. Run `melimo --invidious` without configuration.
+On first use, Mélimo fetches HTTPS API candidates from the official instance
+registry and caches them for ten minutes. Discovery never blocks Deezer startup.
+Search retries available candidates with a four-second timeout per instance.
+Before playback, up to three instances deliver a small audio sample concurrently;
+the fastest measured delivery is retained and continues directly into playback.
+This measures current delivery to your connection, not a guaranteed maximum
+bandwidth. Probes have a six-second deadline and bounded buffers. Failed instances
+are removed from the cache. A failure after playback starts is reported for retry;
+audio from different instances is never concatenated mid-track.
+
+Optional settings go in `$XDG_CONFIG_HOME/melimo/config.toml` (default
+`~/.config/melimo/config.toml`) or the file named by `MELIMO_CONFIG`:
 
 ```toml
-[youtube]
+[invidious]
 enabled = true
-invidious_instance = "https://example.invalid"
+# Optional override; omit for automatic discovery:
+# invidious_instance = "https://example.invalid"
 ```
 
-Replace the placeholder with an Invidious-compatible instance you choose. There
-is no built-in public instance and YouTube is disabled by default. Use HTTPS for
-remote instances; HTTP is supported for locally hosted instances. Credentials,
-query strings and fragments are rejected in the instance setting; path prefixes
-are supported. Invalid TOML, unreadable files and invalid enabled settings produce
-configuration errors without echoing settings.
+An explicit instance bypasses discovery and comparison probes. HTTP is supported
+for locally hosted instances. Credentials, query strings and fragments are rejected
+in the instance setting; path prefixes are supported. Use `enabled = false` to
+disable the provider. The provider CLI flag and configuration section are now
+`--invidious` and `[invidious]`; update older configurations accordingly.
 
-Run `melimo --youtube` for anonymous YouTube-only playback; this mode does not
-read Deezer credentials or require login. With a Deezer login and YouTube enabled,
+Run `melimo --invidious` for anonymous Invidious-only playback; this mode does not
+read Deezer credentials or require login. With a Deezer login and Invidious enabled,
 run `melimo` for both providers. Press `P` outside text entry to switch search
 provider, then `/`, a query, and `Enter`. Search results and the queue show `[DZR]`
-or `[YT]`. Select a result and press `Enter` to play; `e` adds it to the queue.
+or `[INV]`. Select a result and press `Enter` to play; `e` adds it to the queue.
 Provider switches and searches preserve the playing item and queue. `b` opens the
 queue; `Enter` there starts playback from the selected entry. `Space`, arrows,
 `n`, `s`, volume and mute work through the same player for both providers.
@@ -122,7 +132,7 @@ a second failure is shown in the player. Select the result again to retry.
 Seeking resolves a fresh stream and decodes forward from the start, so long seeks
 can buffer and use extra bandwidth. Stop clears the queue, as in Deezer mode.
 
-No YouTube login, cookies, browser player, advertising UI, yt-dlp or ffmpeg is
+No Invidious login, cookies, browser player, advertising UI, yt-dlp or ffmpeg is
 needed at runtime. AAC decoding is compiled into the existing Rodio player.
 Metadata requests ask for proxied media URLs with `local=true`. The instance and
 returned media hosts receive network requests; availability,
@@ -130,8 +140,8 @@ rate limits and regional access depend on that infrastructure. Errors never echo
 raw responses or signed audio URLs. No audio is saved to disk.
 
 Deezer discovery, playlists, favorites and lyrics remain Deezer capabilities.
-YouTube starts on search; `d` returns to search, and `q`/`Esc` from that screen exits.
-`Tab` explains that YouTube playlists are not yet available. Combined search,
+Invidious starts on search; `d` returns to search, and `q`/`Esc` from that screen exits.
+`Tab` explains that Invidious playlists are not yet available. Combined search,
 playlists, resolver fallback, opt-in SponsorBlock and video remain future work in
 [next steps](docs/NEXT_STEPS.md).
 
@@ -167,11 +177,11 @@ words, and do not remove vocals. Missing lyrics never prevent playback.
 | `l` | Lyrics/karaoke |
 | `f` | Add/remove selected or current song from **your Deezer favorites** |
 | `L` | Refresh login; stops playback and clears the queue |
-| `d`, `/`, `Tab` | Discover (YouTube: search) / edit search / change Deezer search type |
+| `d`, `/`, `Tab` | Discover (Invidious: search) / edit search / change Deezer search type |
 | `P` | Switch search provider outside text entry |
 | `Backspace`, `Ctrl+U` | Delete character / clear search |
 | `?` | Help |
-| `q`, `Esc` | Back; quit from Discover or YouTube search |
+| `q`, `Esc` | Back; quit from Discover or Invidious search |
 | `Ctrl+C` | Quit |
 
 New searches preserve the queue. Enter on a queued song skips earlier entries.
@@ -200,7 +210,7 @@ show more metadata and lyrics. Terminals smaller than that remain safe to resize
   a fixed HTTPS endpoint; audio URLs are restricted to Deezer/CDN hosts. Redirects
   are disabled and errors omit raw provider responses and credential-bearing URLs.
 - Deezer search returns up to 50 results. Playlist/favorite sets cap at 1,000 tracks.
-  Flow is a finite batch, not an endlessly replenished radio. YouTube uses the
+  Flow is a finite batch, not an endlessly replenished radio. Invidious uses the
   first Invidious search page, bounded by a 2 MiB API response limit.
 - No previous-track control, persistent queue, alternate quality or browser player.
 - Now-playing metadata appears in the terminal title, so it can be visible in

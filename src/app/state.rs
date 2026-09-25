@@ -300,16 +300,17 @@ impl App {
                 self.pending_playlist_play = None;
                 self.editing = false;
                 self.selected = Some(0);
-                if self.search_provider == ProviderId::YouTube {
+                if self.search_provider == ProviderId::Invidious {
                     self.view = View::Search;
                     self.selected = (!self.tracks.is_empty()).then_some(0);
-                    self.notice = Some("YouTube: / to search videos · P switches provider.".into());
+                    self.notice =
+                        Some("Invidious: / to search videos · P switches provider.".into());
                 }
             }
             Action::ToggleSearchKind => {
-                if self.search_provider == ProviderId::YouTube {
+                if self.search_provider == ProviderId::Invidious {
                     self.notice = Some(
-                        "YouTube playlists are not available yet. Use / to search videos.".into(),
+                        "Invidious playlists are not available yet. Use / to search videos.".into(),
                     );
                     return None;
                 }
@@ -423,7 +424,7 @@ impl App {
             Action::Back if self.view == View::Queue => self.view = View::Search,
             Action::Back if self.view == View::NowPlaying => self.view = View::Search,
             Action::Back if self.view == View::Search => {
-                if self.search_provider == ProviderId::YouTube {
+                if self.search_provider == ProviderId::Invidious {
                     self.quit = true;
                     return None;
                 }
@@ -562,10 +563,10 @@ mod tests {
     fn mixed_queue_preserves_provider_even_when_ids_match() {
         let mut deezer = track();
         deezer.provider = crate::provider::ProviderId::Deezer;
-        let mut youtube = deezer.clone();
-        youtube.provider = crate::provider::ProviderId::YouTube;
+        let mut invidious = deezer.clone();
+        invidious.provider = crate::provider::ProviderId::Invidious;
         let mut app = App {
-            tracks: vec![deezer.clone(), youtube.clone()],
+            tracks: vec![deezer.clone(), invidious.clone()],
             selected: Some(0),
             ..App::default()
         };
@@ -573,11 +574,11 @@ mod tests {
         assert_eq!(app.opened.as_ref(), Some(&deezer));
         app.tracks.clear();
         app.update(Action::NextTrack);
-        assert_eq!(app.opened.as_ref(), Some(&youtube));
+        assert_eq!(app.opened.as_ref(), Some(&invidious));
         app.update(Action::TogglePause);
         app.update(Action::SeekRelative(10));
         assert!(app.pause_requested);
-        assert_eq!(app.opened.as_ref(), Some(&youtube));
+        assert_eq!(app.opened.as_ref(), Some(&invidious));
         app.update(Action::StopPlayback);
         assert!(app.queue.is_empty());
     }
@@ -585,7 +586,7 @@ mod tests {
     #[test]
     fn provider_switch_invalidates_search_but_preserves_player_and_queue() {
         let mut app = App {
-            providers: vec![ProviderId::Deezer, ProviderId::YouTube],
+            providers: vec![ProviderId::Deezer, ProviderId::Invidious],
             tracks: vec![track(), track()],
             ..App::default()
         };
@@ -603,13 +604,13 @@ mod tests {
         assert_eq!(app.opened, playing);
         assert_eq!(app.playback_id, playback_id);
         assert_eq!(app.queue.len(), 1);
-        assert_eq!(app.search_provider, ProviderId::YouTube);
+        assert_eq!(app.search_provider, ProviderId::Invidious);
         app.update(Action::ToggleSearchKind);
         assert!(!app.playlist_search);
         app.update(Action::Discover);
         assert!(app.view == View::Search);
         let request = app.update(Action::SubmitSearch).unwrap();
-        assert_eq!(request.provider, ProviderId::YouTube);
+        assert_eq!(request.provider, ProviderId::Invidious);
         assert!(matches!(request.kind, BrowseKind::Tracks));
     }
 

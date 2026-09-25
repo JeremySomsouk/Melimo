@@ -1,5 +1,5 @@
-# Copy to your user configuration directory or select it with MELIMO_CONFIG.
-# Never commit your personal instance settings.
-[youtube]
-enabled = false
-invidious_instance = "https://example.invalid"
+# Automatic discovery is enabled without a configuration file.
+[invidious]
+enabled = true
+# Optional explicit override, bypassing discovery:
+# invidious_instance = "https://example.invalid"

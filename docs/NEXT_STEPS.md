@@ -1,5 +1,16 @@
 # Mélimo next steps
 
+## IN PROGRESS — Automatic Invidious discovery
+
+- [ ] Make YouTube available without a hand-configured instance.
+- [ ] Discover HTTPS API instances from the official public registry on first use.
+- [ ] Validate candidates with bounded timeouts and retain a working choice in memory.
+- [ ] Preserve explicit instance overrides and report discovery failures in the TUI.
+- [ ] Add registry/failover tests, verify live discovery, rebuild and install locally.
+
+Discovery is lazy so an unavailable registry never blocks Deezer startup. No
+public media instance is hard-coded; explicit settings continue to take precedence.
+
 ## COMPLETE — YouTube / Invidious audio provider (2026-09-25)
 
 - [x] Introduce and test provider-aware media models and provider routing.

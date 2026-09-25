@@ -1,5 +1,33 @@
 # Mélimo next steps
 
+## IN PROGRESS — YouTube / Invidious audio provider
+
+- [ ] Introduce and test provider-aware media models and provider routing.
+- [ ] Preserve Deezer search, discovery, authentication and playback behavior.
+- [ ] Add validated, configurable Invidious settings (disabled by default).
+- [ ] Implement Invidious search and map results into shared media items.
+- [ ] Implement video metadata lookup and replaceable audio stream resolution.
+- [ ] Connect resolved audio to the existing player and normal mixed queue.
+- [ ] Support play/pause, seek, stop and provider identification in the TUI.
+- [ ] Handle provider, timeout, rate-limit, restriction and playback errors.
+- [ ] Add unit and focused HTTP/playback integration tests; run existing tests.
+- [ ] Document configuration, architecture and runtime dependencies.
+
+Initial scope: provider-specific search and audio-only playback. No browser player,
+authentication, video renderer or SponsorBlock integration for YouTube.
+
+### Future provider TODO (outside this milestone)
+
+- [ ] Opt-in/configurable SponsorBlock segments (sponsor, intro, outro, self-promotion).
+- [ ] Combined Deezer + YouTube search.
+- [ ] YouTube playlists.
+- [ ] Channel browsing.
+- [ ] Subscriptions.
+- [ ] Local YouTube history/favorites.
+- [ ] Configurable resolver fallback (such as optional external yt-dlp).
+- [ ] Native/external video playback.
+- [ ] Terminal-rendered video.
+
 ## v0.1.0 terminal player complete
 
 - [x] Give the terminal interface a more polished, distinctive Mélimo identity
@@ -58,4 +86,3 @@ Sources checked 2026-09-23:
 - Website: https://github.com/JeremySomsouk/jeremysomsouk.github.io
 - Static hosting: https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages
 - Browser CORS: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
-

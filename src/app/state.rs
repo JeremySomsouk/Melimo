@@ -149,6 +149,12 @@ pub const DISCOVER: &[(&str, &str)] = &[
     ("Search playlists by keyword…", ""),
 ];
 
+pub const DISCOVER_GROUPS: &[(&str, &[usize])] = &[
+    ("Your music", &[0, 1, 2, 3, 17]),
+    ("Genres", &[4, 5, 6, 7, 8, 9]),
+    ("Mood / Activity", &[10, 11, 12, 13, 14, 15, 16]),
+];
+
 impl App {
     fn begin_playback(&mut self, track: Track) {
         self.lyrics = None;
@@ -468,6 +474,27 @@ impl App {
                 }
             }
             Action::SearchFinished { .. } => {} // Ignore obsolete responses.
+            Action::DiscoverGroup(direction) => {
+                if self.view == View::Discover
+                    && let Some(selected) = self.selected
+                    && let Some((group, row)) =
+                        DISCOVER_GROUPS
+                            .iter()
+                            .enumerate()
+                            .find_map(|(group, (_, indices))| {
+                                indices
+                                    .iter()
+                                    .position(|&index| index == selected)
+                                    .map(|row| (group, row))
+                            })
+                {
+                    let target = group
+                        .saturating_add_signed(direction)
+                        .min(DISCOVER_GROUPS.len() - 1);
+                    let indices = DISCOVER_GROUPS[target].1;
+                    self.selected = Some(indices[row.min(indices.len() - 1)]);
+                }
+            }
             Action::MoveDown => {
                 if let Some(index) = self.selected {
                     self.selected = Some((index + 1).min(self.result_count().saturating_sub(1)));
@@ -612,6 +639,31 @@ mod tests {
         let request = app.update(Action::SubmitSearch).unwrap();
         assert_eq!(request.provider, ProviderId::Invidious);
         assert!(matches!(request.kind, BrowseKind::Tracks));
+    }
+
+    #[test]
+    fn discovery_groups_preserve_rows_clamp_and_open_the_correct_query() {
+        let mut app = App::default();
+        app.update(Action::Discover);
+        app.selected = Some(3);
+        app.update(Action::DiscoverGroup(1));
+        assert_eq!(app.selected, Some(7));
+        let request = app.update(Action::OpenTrack).unwrap();
+        assert_eq!(request.query, "jazz");
+        app.update(Action::Discover);
+        app.selected = Some(16);
+        app.update(Action::DiscoverGroup(-1));
+        assert_eq!(app.selected, Some(9));
+        app.update(Action::DiscoverGroup(-1));
+        assert_eq!(app.selected, Some(17));
+        app.update(Action::DiscoverGroup(-1));
+        assert_eq!(app.selected, Some(17));
+        let mut indices: Vec<_> = DISCOVER_GROUPS
+            .iter()
+            .flat_map(|(_, indices)| indices.iter().copied())
+            .collect();
+        indices.sort_unstable();
+        assert_eq!(indices, (0..DISCOVER.len()).collect::<Vec<_>>());
     }
 
     #[test]

@@ -17,6 +17,7 @@ pub enum Action {
     Backspace,
     ClearQuery,
     SubmitSearch,
+    DiscoverGroup(isize),
     MoveDown,
     MoveUp,
     First,

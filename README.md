@@ -184,6 +184,10 @@ MELIMO_THEME=mono melimo --invidious  # inherit terminal colors
 
 A nonempty `NO_COLOR` takes precedence. The compact player supports terminals
 from 40 columns wide; larger windows show more metadata and lyrics.
+Discover shows Your music, Genres, and Mood / Activity in three columns at
+90 characters wide or more. Use left/right arrows to move between groups.
+The bottom player stays visible while browsing, with a single-line version
+in short windows.
 
 ## Current limits
 

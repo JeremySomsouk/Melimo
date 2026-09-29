@@ -48,6 +48,8 @@ fn map_key(key: KeyEvent, app: &App) -> Option<Action> {
         KeyCode::Char('q') | KeyCode::Esc => Some(Action::Back),
         KeyCode::Char('?') => Some(Action::ToggleHelp),
         KeyCode::Char('/') => Some(Action::FocusSearch),
+        KeyCode::Left if app.view == View::Discover => Some(Action::DiscoverGroup(-1)),
+        KeyCode::Right if app.view == View::Discover => Some(Action::DiscoverGroup(1)),
         KeyCode::Left if app.view == View::NowPlaying => Some(Action::SeekRelative(-10)),
         KeyCode::Right if app.view == View::NowPlaying => Some(Action::SeekRelative(10)),
         KeyCode::Char(' ') => Some(Action::TogglePause),

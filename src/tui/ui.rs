@@ -1,57 +1,51 @@
 use super::theme;
-use crate::app::state::{App, DISCOVER, PlaybackState, View};
-use ratatui::text::{Line, Span};
+use crate::app::state::{App, DISCOVER, DISCOVER_GROUPS, PlaybackState, View};
+use ratatui::text::Line;
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout},
-    widgets::{Gauge, Paragraph, Row, Table, TableState, Wrap},
+    layout::{Constraint, Layout, Rect},
+    widgets::{Block, Gauge, Paragraph, Row, Table, TableState, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
 pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableState) {
-    frame.render_widget(Paragraph::new("").style(theme::base()), frame.area());
-    let compact = frame.area().width < 72;
-    let [header, body, footer] = Layout::vertical([
+    let theme = theme::Theme::from_env();
+    frame.render_widget(Block::default().style(theme.base()), frame.area());
+    let [header, body, footer, player] = Layout::vertical([
         Constraint::Length(2),
         Constraint::Min(0),
-        Constraint::Length(3),
+        Constraint::Length(if app.notice.is_some() { 2 } else { 1 }),
+        Constraint::Length(
+            if frame.area().height >= 18
+                && !(app.view == View::NowPlaying && frame.area().height < 22)
+            {
+                6
+            } else {
+                1
+            },
+        ),
     ])
     .areas(frame.area());
     frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(" Mélimo ", theme::selected()),
-            Span::styled(format!("  {provider}"), theme::muted()),
-            Span::styled(
-                if compact {
-                    ""
-                } else {
-                    "  ·  your music, here"
-                },
-                theme::muted(),
-            ),
-        ])),
+        Paragraph::new(vec![
+            Line::styled("Mélimo  /  music for your terminal", theme.accent()),
+            Line::styled(provider.to_owned(), theme.secondary()),
+        ]),
         header,
     );
     if app.show_help {
-        frame.render_widget(Paragraph::new("/  Edit search · Enter submits\nBackspace  Delete last character · Ctrl+U  Clear query\nj/k or ↑/↓  Select · g/G  First/last\nEnter  Play selected track\nSpace  Pause/resume · ←/→  Seek 10s · +/-  Volume · m  Mute · l  Lyrics/karaoke · s  Stop\nd  Discover genres, moods, Flow & favorites\nP  Switch search provider · Tab  Tracks / playlists (Deezer)\na  Play all displayed tracks · n  Next queued track\np  Return to player · b  Queue · r  Shuffle and play\ne  Enqueue selected track · Delete  Remove queued track\nf  Toggle selected/current Deezer favorite · L  Refresh login\nq / Esc  Back, or quit from Discover\nCtrl+C  Always quit\n?  Toggle help").block(theme::panel().title("Help")).wrap(Wrap { trim: true }), body);
+        frame.render_widget(Paragraph::new("/  Edit search · Enter submits\nBackspace  Delete last character · Ctrl+U  Clear query\nj/k or ↑/↓  Select · g/G  First/last\nEnter  Play selected track\nSpace  Pause/resume · ←/→  Seek 10s · +/-  Volume · m  Mute · l  Lyrics/karaoke · s  Stop\nd  Discover genres, moods, Flow & favorites\nP  Switch search provider · Tab  Tracks / playlists (Deezer)\na  Play all displayed tracks · n  Next queued track\np  Return to player · b  Queue · r  Shuffle and play\ne  Enqueue selected track · Delete  Remove queued track\nf  Toggle selected/current Deezer favorite · L  Refresh login\nq / Esc  Back, or quit from Discover\nCtrl+C  Always quit\n?  Toggle help").block(theme.panel("Help")).wrap(Wrap { trim: true }), body);
     } else if app.view == View::Discover {
-        let rows = DISCOVER.iter().map(|(title, _)| Row::new([*title]));
-        table.select(app.selected);
-        frame.render_stateful_widget(
-            Table::new(rows, [Constraint::Percentage(100)])
-                .block(theme::panel().title("Discover · genre, mood & your music"))
-                .row_highlight_style(theme::selected())
-                .highlight_symbol("› "),
-            body,
-            table,
-        );
+        render_discover(frame, body, app, &theme, table);
     } else if app.view == View::Queue && app.queue.is_empty() {
-        frame.render_widget(
-            Paragraph::new("Your queue is empty.\nSearch with /, then press e to add a track.")
-                .style(theme::muted())
-                .block(theme::panel().title("Up next"))
-                .wrap(Wrap { trim: true }),
+        render_state(
+            frame,
             body,
+            &theme,
+            "Up next",
+            "Your queue is empty",
+            "Browse with d, then press e on a track to add it.",
+            "Add several tracks to keep the music going.",
         );
     } else if app.view == View::Queue {
         table.select(app.selected);
@@ -70,21 +64,30 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
                     Constraint::Length(6),
                 ],
             )
-            .block(theme::panel().title(format!("Up next · {} tracks", app.queue.len())))
-            .row_highlight_style(theme::selected())
+            .block(theme.panel(format!(
+                "Up next · {} · Enter jumps here · Delete removes · r shuffles & plays",
+                app.queue.len()
+            )))
+            .row_highlight_style(theme.selected())
             .highlight_symbol("› "),
             body,
             table,
         );
     } else if app.view == View::NowPlaying {
         if let Some(track) = &app.opened {
-            let block = theme::panel().title("Now Playing");
+            let block = theme.panel("Now Playing");
             let inner = block.inner(body);
             frame.render_widget(block, body);
             let [details, progress, controls, lyrics_area] = Layout::vertical([
                 Constraint::Length(4),
                 Constraint::Length(1),
-                Constraint::Length(if compact { 3 } else { 2 }),
+                Constraint::Length(if frame.area().height < 18 {
+                    0
+                } else if inner.width < 70 {
+                    3
+                } else {
+                    2
+                }),
                 Constraint::Min(0),
             ])
             .areas(inner);
@@ -92,77 +95,79 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
                 Paragraph::new(vec![
                     Line::styled(
                         format!("[{}] {}", track.provider.label(), track.title),
-                        theme::title(),
+                        theme.title(),
                     ),
-                    Line::styled(track.artist.clone(), theme::base()),
+                    Line::raw(track.artist.clone()),
                     Line::styled(
                         format!("{} · {}", track.provider.name(), track.album),
-                        theme::muted(),
+                        theme.secondary(),
                     ),
                     Line::styled(
-                        playback_label(app),
-                        if matches!(app.playback, PlaybackState::Error(_)) {
-                            theme::warning()
-                        } else {
-                            theme::title()
+                        match &app.playback {
+                            PlaybackState::Error(error) => error.as_str(),
+                            _ => playback_label(app),
                         },
+                        theme.accent(),
                     ),
                 ]),
                 details,
             );
-            frame.render_widget(
-                Gauge::default()
-                    .gauge_style(theme::selected())
-                    .ratio(if track.duration_secs == 0 {
-                        0.0
-                    } else {
-                        (app.elapsed as f64 / track.duration_secs as f64).clamp(0.0, 1.0)
-                    })
-                    .label(format!(
-                        "{} / {}",
-                        format_time(app.elapsed),
-                        format_time(track.duration_secs)
-                    )),
-                progress,
-            );
-            let transport = if app.pause_requested {
+            frame.render_widget(progress_gauge(app, track.duration_secs, &theme), progress);
+            let pause = if app.pause_requested {
                 "Resume"
             } else {
                 "Pause"
             };
-            let hints = if compact {
+            let controls_text = if inner.width < 70 {
                 format!(
-                    "[Space] {transport}  [←/→] seek\n[+/-] {}  [m] mute  [l] lyrics\n[n] next  [s] stop  [b] queue  [f] fav",
+                    "Space {pause} · ←/→ seek\n+/- volume {} · m mute\nl lyrics · n next · b queue · ? help",
                     volume_label(app)
                 )
             } else {
                 format!(
-                    "[Space] {transport}  [←/→] seek 10s  [+/-] {}  [m] mute\n[l] lyrics  [n] next  [s] stop  [b] queue  [f] favorite",
+                    "Space {pause} · ←/→ seek 10s · +/- volume {} · m mute\nl lyrics · n next · s stop · b queue · f favorite",
                     volume_label(app)
                 )
             };
-            frame.render_widget(Paragraph::new(hints).style(theme::muted()), controls);
+            frame.render_widget(Paragraph::new(controls_text), controls);
             if app.karaoke {
-                let block = theme::panel().title(if compact {
-                    "Lyrics"
-                } else {
-                    "Lyrics · synchronized when available"
-                });
+                let block = theme.panel("Lyrics · synchronized when available");
                 let area = block.inner(lyrics_area);
                 frame.render_widget(block, lyrics_area);
                 match &app.lyrics {
-                    None => frame.render_widget(
-                        Paragraph::new("Loading lyrics…").style(theme::muted()),
+                    None => render_state_text(
+                        frame,
                         area,
+                        &theme,
+                        "Loading lyrics…",
+                        "l returns to the player.",
+                        "Playback continues while lyrics load.",
                     ),
-                    Some(Err(_)) => frame.render_widget(
-                        Paragraph::new("Lyrics unavailable for this track or session."),
+                    Some(Err(_)) => render_state_text(
+                        frame,
                         area,
+                        &theme,
+                        "Lyrics unavailable",
+                        "l returns to the player.",
+                        "No lyrics were supplied for this track or session.",
                     ),
+                    Some(Ok(lyrics)) if lyrics.lines.is_empty() && lyrics.plain.is_empty() => {
+                        render_state_text(
+                            frame,
+                            area,
+                            &theme,
+                            "No lyrics available",
+                            "l returns to the player.",
+                            "Try another song for synchronized lyrics.",
+                        )
+                    }
                     Some(Ok(lyrics)) if !lyrics.lines.is_empty() => {
                         let active = lyrics.active_line(app.elapsed_ms);
-                        let show_credits = area.height > 1;
-                        let rows = usize::from(area.height.saturating_sub(u16::from(show_credits)));
+                        let rows = usize::from(if area.height > 1 {
+                            area.height - 1
+                        } else {
+                            area.height
+                        });
                         let start = active.unwrap_or(0).saturating_sub(rows / 2);
                         let mut lines: Vec<Line> = lyrics
                             .lines
@@ -172,31 +177,35 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
                             .take(rows)
                             .map(|(i, line)| {
                                 if Some(i) == active {
-                                    Line::styled(format!("› {}", line.text), theme::selected())
+                                    Line::styled(format!("› {}", line.text), theme.selected())
                                 } else {
-                                    Line::styled(format!("  {}", line.text), theme::muted())
+                                    Line::styled(format!("  {}", line.text), theme.secondary())
                                 }
                             })
                             .collect();
-                        if show_credits {
-                            lines.push(Line::styled(lyrics.credits.clone(), theme::muted()));
-                        }
+                        lines.push(Line::styled(lyrics.credits.clone(), theme.secondary()));
                         frame.render_widget(Paragraph::new(lines), area);
                     }
                     Some(Ok(lyrics)) => frame.render_widget(
-                        Paragraph::new(if lyrics.plain.is_empty() {
-                            "No lyrics available.".to_string()
-                        } else {
-                            format!(
-                                "Unsynchronized lyrics\n{}\n{}",
-                                lyrics.plain, lyrics.credits
-                            )
-                        })
+                        Paragraph::new(format!(
+                            "Unsynchronized lyrics\n{}\n{}",
+                            lyrics.plain, lyrics.credits
+                        ))
                         .wrap(Wrap { trim: false }),
                         area,
                     ),
                 }
             }
+        } else {
+            render_state(
+                frame,
+                body,
+                &theme,
+                "Now Playing",
+                "Nothing playing yet",
+                "Press d to discover music or / to search.",
+                "Select a track and press Enter to start listening.",
+            );
         }
     } else {
         let [search, results] =
@@ -213,9 +222,8 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
         frame.render_widget(
             Paragraph::new(input)
                 .scroll((0, scroll))
-                .block(theme::panel().title(format!(
-                    "Search [{}] {} · {} · P provider",
-                    app.search_provider.label(),
+                .block(theme.panel(format!(
+                    "Search {} · {} · Tab switches",
                     if app.playlist_search {
                         "playlists"
                     } else {
@@ -226,17 +234,31 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             search,
         );
         let message = if app.loading {
-            Some("Loading…")
+            Some((
+                "Finding your music…",
+                "Press d to return to Discover.",
+                "Results will appear here when ready.",
+            ))
         } else if let Some(error) = &app.error {
-            Some(error.as_str())
+            Some((
+                "Could not load music",
+                "Press / to search again or d to browse.",
+                error.as_str(),
+            ))
         } else if !app.searched {
-            Some(
-                "Press /, type keywords, then Enter. P switches provider; Tab tracks/playlists; d Discover.",
-            )
+            Some((
+                "Find your next song",
+                "Press / to search or d to browse.",
+                "Use Tab outside text entry to switch tracks and playlists.",
+            ))
         } else if (app.showing_playlists && app.playlists.is_empty())
             || (!app.showing_playlists && app.tracks.is_empty())
         {
-            Some("No matches found. Press / to try other keywords, or d for Discover.")
+            Some((
+                "No music found",
+                "Try other keywords with / or browse with d.",
+                "This search or collection has no available results.",
+            ))
         } else {
             None
         };
@@ -248,17 +270,19 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             } else {
                 "Tracks"
             });
-        if let Some(message) = message {
-            frame.render_widget(
-                Paragraph::new(message)
-                    .style(if app.error.is_some() {
-                        theme::warning()
-                    } else {
-                        theme::muted()
-                    })
-                    .block(theme::panel().title(title))
-                    .wrap(Wrap { trim: true }),
+        if let Some((heading, hint, detail)) = message {
+            render_state(
+                frame,
                 results,
+                &theme,
+                title,
+                heading,
+                if app.editing {
+                    "Enter searches; Esc returns to browsing."
+                } else {
+                    hint
+                },
+                detail,
             );
         } else if app.showing_playlists {
             let rows = app.playlists.iter().map(|p| {
@@ -267,7 +291,7 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
                     if p.tracks > 0 {
                         p.tracks.to_string()
                     } else {
-                        "—".into()
+                        "-".into()
                     },
                 ])
             });
@@ -275,10 +299,10 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
             frame.render_stateful_widget(
                 Table::new(rows, [Constraint::Min(10), Constraint::Length(8)])
                     .header(
-                        Row::new(["Playlist · Enter to inspect", "Tracks"]).style(theme::title()),
+                        Row::new(["Playlist · Enter to inspect", "Tracks"]).style(theme.title()),
                     )
-                    .block(theme::panel().title(format!("{title} · {}", app.playlists.len())))
-                    .row_highlight_style(theme::selected())
+                    .block(theme.panel(format!("{title} · {}", app.playlists.len())))
+                    .row_highlight_style(theme.selected())
                     .highlight_symbol("› "),
                 results,
                 table,
@@ -299,15 +323,17 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
                     Constraint::Length(6),
                 ],
             )
-            .header(Row::new(["Title", "Artist", "Time"]).style(theme::title()))
-            .block(theme::panel().title(format!("{title} · {} · a plays all", app.tracks.len())))
-            .row_highlight_style(theme::selected())
+            .header(Row::new(["Title", "Artist", "Time"]).style(theme.title()))
+            .block(theme.panel(format!("{title} · {} · a plays all", app.tracks.len())))
+            .row_highlight_style(theme.selected())
             .highlight_symbol("› ");
             table.select(app.selected);
             frame.render_stateful_widget(widget, results, table);
         }
     }
-    let footer_text = if app.show_help {
+    let footer_text = if frame.area().width < 70 && !app.editing && !app.show_help {
+        "? help · p player · d discover"
+    } else if app.show_help {
         "? / q close help · Ctrl+C quit"
     } else if app.editing {
         "Enter search · Esc leave input · Ctrl+U clear"
@@ -316,40 +342,201 @@ pub fn render(frame: &mut Frame, app: &App, provider: &str, table: &mut TableSta
     } else if app.view == View::Queue {
         "Enter play from here · r shuffle/play · n next · f favorite · p player · q back"
     } else if app.view == View::Discover {
-        "Enter browse · / search · P provider · p player · L login · ? help"
+        "Enter browse · ←/→ groups · P provider · / search · p player · L login · ? help"
     } else if app.showing_playlists {
         "Enter inspect · a play playlist · r shuffle/play · / search · p player · b queue"
     } else {
         "Enter play · a all · r shuffle · e enqueue · f favorite · p player · b queue"
     };
-    let footer_text = if compact && !app.editing && !app.show_help {
-        "/ search · p player · ? help"
-    } else {
-        footer_text
-    };
-    let playing = app
-        .opened
-        .as_ref()
-        .map(|track| {
-            format!(
-                "{} · {} — {} · {} · vol {} · {} queued",
-                playback_label(app),
-                track.artist,
-                track.title,
-                format_time(app.elapsed),
-                volume_label(app),
-                app.queue.len()
-            )
-        })
-        .unwrap_or_default();
     frame.render_widget(
-        Paragraph::new(vec![
-            Line::styled(footer_text, theme::muted()),
-            Line::styled(playing, theme::title()),
-            Line::styled(app.notice.as_deref().unwrap_or(""), theme::warning()),
-        ]),
+        Paragraph::new(format!(
+            "{footer_text}\n{}",
+            app.notice.as_deref().unwrap_or("")
+        )),
         footer,
     );
+    render_bottom_player(frame, player, app, &theme);
+}
+
+fn render_state(
+    frame: &mut Frame,
+    area: Rect,
+    theme: &theme::Theme,
+    title: &str,
+    heading: &str,
+    hint: &str,
+    detail: &str,
+) {
+    let panel = theme.panel(title);
+    let inner = panel.inner(area);
+    frame.render_widget(panel, area);
+    render_state_text(frame, inner, theme, heading, hint, detail);
+}
+
+fn render_state_text(
+    frame: &mut Frame,
+    area: Rect,
+    theme: &theme::Theme,
+    heading: &str,
+    hint: &str,
+    detail: &str,
+) {
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::styled(heading, theme.accent()),
+            Line::styled(hint, theme.title()),
+            Line::styled(detail, theme.secondary()),
+        ])
+        .wrap(Wrap { trim: true }),
+        area,
+    );
+}
+
+fn render_discover(
+    frame: &mut Frame,
+    area: Rect,
+    app: &App,
+    theme: &theme::Theme,
+    table: &mut TableState,
+) {
+    if area.width < 90 {
+        table.select(app.selected);
+        frame.render_stateful_widget(
+            Table::new(
+                DISCOVER.iter().map(|(title, _)| Row::new([*title])),
+                [Constraint::Percentage(100)],
+            )
+            .block(theme.panel("Discover · genre, mood & your music"))
+            .row_highlight_style(theme.selected())
+            .highlight_symbol("› "),
+            area,
+            table,
+        );
+        return;
+    }
+    let columns = Layout::horizontal([
+        Constraint::Percentage(40),
+        Constraint::Percentage(28),
+        Constraint::Percentage(32),
+    ])
+    .split(area);
+    for ((title, indices), column) in DISCOVER_GROUPS.iter().zip(columns.iter()) {
+        let mut selection = TableState::default();
+        selection.select(
+            app.selected
+                .and_then(|selected| indices.iter().position(|&index| index == selected)),
+        );
+        let rows = indices.iter().map(|&index| {
+            let label = DISCOVER[index].0;
+            Row::new([label.strip_prefix("Genre · ").unwrap_or(label)])
+        });
+        frame.render_stateful_widget(
+            Table::new(rows, [Constraint::Percentage(100)])
+                .block(theme.panel(*title))
+                .row_highlight_style(theme.selected())
+                .highlight_symbol("› "),
+            *column,
+            &mut selection,
+        );
+    }
+}
+
+fn render_bottom_player(frame: &mut Frame, area: Rect, app: &App, theme: &theme::Theme) {
+    if area.height <= 1 {
+        let text = app.opened.as_ref().map_or_else(
+            || "Mélimo · Select a track to play".to_string(),
+            |track| {
+                format!(
+                    "{} · {} / {} · {}",
+                    playback_label(app),
+                    track.title,
+                    track.artist,
+                    format_time(app.elapsed)
+                )
+            },
+        );
+        frame.render_widget(Paragraph::new(text).style(theme.accent()), area);
+        return;
+    }
+    let block = theme.panel(format!("Now playing · {}", playback_label(app)));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let [title, artist, progress, controls] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+    ])
+    .areas(inner);
+    if let Some(track) = &app.opened {
+        frame.render_widget(
+            Paragraph::new(format!("[{}] {}", track.provider.label(), track.title))
+                .style(theme.title()),
+            title,
+        );
+        frame.render_widget(
+            Paragraph::new(format!(
+                "{} · vol {} · {} queued",
+                track.artist,
+                volume_label(app),
+                app.queue.len()
+            ))
+            .style(theme.secondary()),
+            artist,
+        );
+        if let PlaybackState::Error(error) = &app.playback {
+            frame.render_widget(
+                Paragraph::new(error.as_str()).style(theme.secondary()),
+                progress,
+            );
+        } else {
+            frame.render_widget(progress_gauge(app, track.duration_secs, theme), progress);
+        }
+    } else {
+        frame.render_widget(
+            Paragraph::new("Your next song starts here").style(theme.title()),
+            title,
+        );
+        frame.render_widget(
+            Paragraph::new("Select a track or playlist to play").style(theme.secondary()),
+            artist,
+        );
+    }
+    let hint = if app.show_help {
+        "Close help to use playback controls"
+    } else if app.editing {
+        "Esc leaves search to use playback controls"
+    } else if matches!(app.playback, PlaybackState::Error(_)) {
+        "n skips queued track · d browse · / search"
+    } else if app.opened.is_none() {
+        "d discover · / search"
+    } else if inner.width < 70 {
+        if app.pause_requested {
+            "Space Resume · n next · m mute · p player"
+        } else {
+            "Space Pause · n next · m mute · p player"
+        }
+    } else if app.pause_requested {
+        "Space Resume · n next · s stop · +/- volume · m mute · b queue · p player"
+    } else {
+        "Space Pause · n next · s stop · +/- volume · m mute · b queue · p player"
+    };
+    frame.render_widget(Paragraph::new(hint).style(theme.accent()), controls);
+}
+
+fn progress_gauge(app: &App, duration: u64, theme: &theme::Theme) -> Gauge<'static> {
+    Gauge::default()
+        .gauge_style(theme.progress())
+        .ratio(if duration == 0 {
+            0.0
+        } else {
+            (app.elapsed as f64 / duration as f64).clamp(0.0, 1.0)
+        })
+        .label(format!(
+            "{} / {}",
+            format_time(app.elapsed),
+            format_time(duration)
+        ))
 }
 
 fn volume_label(app: &App) -> String {
@@ -368,7 +555,7 @@ fn playback_label(app: &App) -> &str {
         PlaybackState::Playing => "Playing",
         PlaybackState::Paused => "Paused",
         PlaybackState::Finished => "Finished",
-        PlaybackState::Error(error) => error,
+        PlaybackState::Error(_) => "Playback unavailable",
     }
 }
 
@@ -488,18 +675,194 @@ mod tests {
                     .collect();
                 assert!(text.contains("0:30 / 2:00"));
                 assert!(text.contains("Resume"));
+                assert!(text.contains("m mute"));
+                let buffer = terminal.backend().buffer();
+                assert!(buffer.content.iter().any(|cell| cell.symbol() == "D"
+                    && cell.modifier.contains(ratatui::style::Modifier::BOLD)));
                 assert!(text.contains("› Active demo line"));
-                assert!(text.contains("[l] lyrics"));
-                assert!(text.contains("[f] fav"));
             }
         }
     }
 
     #[test]
-    fn empty_queue_explains_how_to_add_tracks() {
+    fn bottom_player_persists_across_views_and_input_modes() {
         let mut app = App::default();
-        app.update(crate::app::action::Action::ShowQueue);
-        let mut terminal = Terminal::new(TestBackend::new(60, 18)).unwrap();
+        app.opened = Some(crate::provider::Track {
+            provider: crate::provider::ProviderId::Mock,
+            id: "demo".into(),
+            title: "Sunrise Drive".into(),
+            artist: "Lofi Keys".into(),
+            album: "Demo".into(),
+            duration_secs: 236,
+        });
+        app.elapsed = 84;
+        for width in [60, 100] {
+            for view in [View::Discover, View::Search, View::Queue, View::NowPlaying] {
+                app.view = view;
+                for state in [
+                    PlaybackState::Playing,
+                    PlaybackState::Paused,
+                    PlaybackState::Loading,
+                    PlaybackState::Error("Unavailable".into()),
+                ] {
+                    app.playback = state;
+                    for (editing, help) in [(false, false), (true, false), (false, true)] {
+                        app.editing = editing;
+                        app.show_help = help;
+                        let mut terminal = Terminal::new(TestBackend::new(width, 24)).unwrap();
+                        terminal
+                            .draw(|frame| render(frame, &app, "Mock", &mut TableState::default()))
+                            .unwrap();
+                        let dock: String = terminal
+                            .backend()
+                            .buffer()
+                            .content
+                            .iter()
+                            .skip(usize::from(width) * 18)
+                            .map(|cell| cell.symbol())
+                            .collect();
+                        assert!(dock.contains("Sunrise Drive"));
+                        assert!(dock.contains("Lofi Keys"));
+                        if matches!(app.playback, PlaybackState::Error(_)) {
+                            assert!(dock.contains("Unavailable"));
+                        } else {
+                            assert!(dock.contains("1:24 / 3:56"));
+                        }
+                        assert!(dock.contains(playback_label(&app)));
+                        assert!(dock.contains(if editing {
+                            "Esc leaves search"
+                        } else if help {
+                            "Close help"
+                        } else if matches!(app.playback, PlaybackState::Error(_)) {
+                            "n skips"
+                        } else {
+                            "n next"
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn discovery_columns_keep_each_selected_item_visible() {
+        let mut app = App::default();
+        app.view = View::Discover;
+        for (width, height) in [(60, 18), (100, 18), (120, 24)] {
+            for (index, (label, _)) in DISCOVER.iter().enumerate() {
+                app.selected = Some(index);
+                let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+                terminal
+                    .draw(|frame| render(frame, &app, "Mock", &mut TableState::default()))
+                    .unwrap();
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|cell| cell.symbol())
+                    .collect();
+                assert!(
+                    text.contains(label.strip_prefix("Genre · ").unwrap_or(label)),
+                    "missing {label} at {width}x{height}"
+                );
+                if width >= 90 {
+                    for (title, _) in DISCOVER_GROUPS {
+                        assert!(text.contains(title));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn state_panels_keep_recovery_visible_on_narrow_terminals() {
+        for (width, height) in [(40, 16), (60, 24), (100, 24)] {
+            for (view, loading, searched, error, heading, hint) in [
+                (
+                    View::Queue,
+                    false,
+                    false,
+                    None,
+                    "Your queue is empty",
+                    "Browse with d",
+                ),
+                (
+                    View::NowPlaying,
+                    false,
+                    false,
+                    None,
+                    "Nothing playing yet",
+                    "Press d",
+                ),
+                (
+                    View::Search,
+                    true,
+                    false,
+                    None,
+                    "Finding your music",
+                    "Press d",
+                ),
+                (
+                    View::Search,
+                    false,
+                    false,
+                    None,
+                    "Find your next song",
+                    "Press /",
+                ),
+                (
+                    View::Search,
+                    false,
+                    true,
+                    None,
+                    "No music found",
+                    "Try other keywords",
+                ),
+                (
+                    View::Search,
+                    false,
+                    true,
+                    Some("Synthetic failure".into()),
+                    "Could not load music",
+                    "Press /",
+                ),
+            ] {
+                let mut app = App::default();
+                app.view = view;
+                app.loading = loading;
+                app.searched = searched;
+                app.error = error;
+                let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+                terminal
+                    .draw(|frame| render(frame, &app, "Mock", &mut TableState::default()))
+                    .unwrap();
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|cell| cell.symbol())
+                    .collect();
+                assert!(text.contains(heading), "{width}x{height}: {heading}");
+                assert!(text.contains(hint), "{width}x{height}: {hint}");
+            }
+        }
+    }
+
+    #[test]
+    fn short_player_hides_transport_hints() {
+        let mut app = App::default();
+        app.opened = Some(crate::provider::Track {
+            provider: crate::provider::ProviderId::Mock,
+            id: "demo".into(),
+            title: "Demo".into(),
+            artist: "Artist".into(),
+            album: "Album".into(),
+            duration_secs: 0,
+        });
+        app.view = View::NowPlaying;
+        let mut terminal = Terminal::new(TestBackend::new(60, 16)).unwrap();
         terminal
             .draw(|frame| render(frame, &app, "Mock", &mut TableState::default()))
             .unwrap();
@@ -510,8 +873,9 @@ mod tests {
             .iter()
             .map(|cell| cell.symbol())
             .collect();
-        assert!(text.contains("Your queue is empty."));
-        assert!(text.contains("press e to add a track"));
+        assert!(text.contains("Demo"));
+        assert!(!text.contains("Space Pause"));
+        assert!(!text.contains("m mute"));
     }
 
     #[test]

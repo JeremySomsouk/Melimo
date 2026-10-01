@@ -560,7 +560,17 @@ fn playback_label(app: &App) -> &str {
 }
 
 fn format_time(seconds: u64) -> String {
-    format!("{}:{:02}", seconds / 60, seconds % 60)
+    let mut buffer = std::fmt::NumBuffer::new();
+    let minutes = (seconds / 60).format_into(&mut buffer);
+    let mut text = String::with_capacity(minutes.len() + 3);
+    text.push_str(minutes);
+    text.push(':');
+    let remainder = seconds % 60;
+    if remainder < 10 {
+        text.push('0');
+    }
+    text.push_str(remainder.format_into(&mut buffer));
+    text
 }
 
 #[cfg(test)]
@@ -882,5 +892,11 @@ mod tests {
     fn time_formatting() {
         assert_eq!(format_time(65), "1:05");
         assert_eq!(format_time(0), "0:00");
+        for seconds in [9, 10, 59, 60, 599, 600, 3599, 3600, u64::MAX] {
+            assert_eq!(
+                format_time(seconds),
+                format!("{}:{:02}", seconds / 60, seconds % 60)
+            );
+        }
     }
 }

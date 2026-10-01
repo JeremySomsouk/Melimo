@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Require Rust 1.99 and pin development and CI to Rust 1.99.0.
+- Deny compiler warnings in CI using Cargo's warning policy, alongside strict Clippy.
+- Use Rust 1.98's stack-backed integer formatting for duration labels with one
+  exactly sized output allocation.
+- Parse each audio format's bitrate once when ranking available AAC streams.
+- Require a single balanced bracket pair for bracketed lyric timestamps using
+  `str::strip_circumfix`; continue accepting unbracketed timestamps.
+
 ## 0.2.0 — Unreleased
 
 - Add anonymous Invidious audio search and AAC-LC/M4A streaming.

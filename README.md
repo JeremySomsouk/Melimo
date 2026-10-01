@@ -31,7 +31,8 @@ depends on your account access or the selected public instance.
 
 ## Install
 
-Install current stable Rust and the audio build prerequisites.
+Install Rust 1.99 or newer and the audio build prerequisites. Development and CI
+use Rust 1.99.0, pinned in `rust-toolchain.toml`.
 
 **Debian / Ubuntu**
 

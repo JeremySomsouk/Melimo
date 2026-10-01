@@ -214,7 +214,7 @@ impl StreamResolver for InvidiousProvider {
                     && mime.contains("mp4a.40.2") // AAC-LC supported by the existing decoder.
             })
             .collect();
-        formats.sort_by_key(|f| std::cmp::Reverse(f.bitrate.parse::<u64>().unwrap_or(0)));
+        formats.sort_by_cached_key(|f| std::cmp::Reverse(f.bitrate.parse::<u64>().unwrap_or(0)));
         for format in formats {
             if let Ok(url) = self.instance.join(&format.url)
                 && matches!(url.scheme(), "http" | "https")

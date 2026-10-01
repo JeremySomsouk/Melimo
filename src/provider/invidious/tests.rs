@@ -282,3 +282,19 @@ async fn skips_live_and_upcoming_results_and_empty_queries() {
     assert!(p.search_tracks("live".into()).await.unwrap().is_empty());
     server.requests().await;
 }
+
+#[tokio::test]
+async fn audio_ranking_preserves_ties_and_ignores_invalid_bitrates() {
+    let mut metadata = video();
+    metadata["adaptiveFormats"] = json!([
+        {"url":"/malformed", "type":"audio/mp4; codecs=\"mp4a.40.2\"", "bitrate":"bad"},
+        {"url":"/lower", "type":"audio/mp4; codecs=\"mp4a.40.2\"", "bitrate":"64000"},
+        {"url":"/first-best", "type":"audio/mp4; codecs=\"mp4a.40.2\"", "bitrate":"256000"},
+        {"url":"/second-best", "type":"audio/mp4; codecs=\"mp4a.40.2\"", "bitrate":"256000"},
+        {"url":"/overflow", "type":"audio/mp4; codecs=\"mp4a.40.2\"", "bitrate":"18446744073709551616"}
+    ]);
+    let server = Server::start(vec![Reply::json(metadata)]).await;
+    let audio = server.provider().resolve_audio(&item()).await.unwrap();
+    assert_eq!(audio.url.path(), "/first-best");
+    assert_eq!(server.requests().await.len(), 1);
+}

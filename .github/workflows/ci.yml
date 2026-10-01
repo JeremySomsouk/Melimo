@@ -5,12 +5,14 @@ on:
   pull_request:
 permissions:
   contents: read
+env:
+  CARGO_BUILD_WARNINGS: deny
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: rustfmt, clippy
       - run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config

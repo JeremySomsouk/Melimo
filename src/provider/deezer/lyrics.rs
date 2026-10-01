@@ -66,7 +66,8 @@ fn parse(value: Value) -> Result<Lyrics, DeezerError> {
 }
 
 fn timestamp(value: &str) -> Option<u64> {
-    let (minutes, seconds) = value.trim_matches(['[', ']']).split_once(':')?;
+    let value = value.strip_circumfix('[', ']').unwrap_or(value);
+    let (minutes, seconds) = value.split_once(':')?;
     let minutes: u64 = minutes.parse().ok()?;
     let seconds: f64 = seconds.parse().ok()?;
     if !seconds.is_finite() || !(0.0..60.0).contains(&seconds) {
@@ -86,6 +87,24 @@ fn clean(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn timestamps_require_balanced_brackets_and_valid_seconds() {
+        assert_eq!(timestamp("[01:02.50]"), Some(62500));
+        assert_eq!(timestamp("01:02.50"), Some(62500));
+        for value in [
+            "[01:02.50",
+            "01:02.50]",
+            "[[01:02.50]]",
+            "]01:02.50[",
+            "[0:60]",
+            "[0:-1]",
+            "[0:NaN]",
+            "[18446744073709551615:00]",
+        ] {
+            assert_eq!(timestamp(value), None, "{value}");
+        }
+    }
+
     #[test]
     fn parses_timestamps_sorts_and_preserves_plain_fallback() {
         let lyrics = parse(json!({
